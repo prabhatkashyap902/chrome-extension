@@ -4,12 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@reown/appkit": "^1.8.13",
+    "@reown/appkit-adapter-solana": "^1.8.13",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "vite-plugin-static-copy": "^3.1.3"

@@ -1,36 +1,56 @@
-function getRandomColor() {
-  const letters = "0123456789ABCDEF";
-  let color = "#";
-  for (let i = 0; i < 6; i++) {
-    color += letters[Math.floor(Math.random() * 16)];
-  }
-  return color;
-}
+import { useEffect, useState } from "react";
 
-function App() {
-  const changeBg = async () => {
-    const color = getRandomColor();
-    // Inject a script into the current page to change background color
-    if (window.chrome && chrome.tabs) {
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-      chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: (color) => {
-          document.body.style.background = color;
-        },
-        args: [color],
-      });
-    }
-  };
+export default function App() {
+  const [tweetUrl, setTweetUrl] = useState("");
+  const [wallet, setWallet] = useState("");
+  const [status, setStatus] = useState("");
+  const [signature, setSignature] = useState("");
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    const load = () => {
+      chrome.storage.local.get(
+        ["lastTweetUrl", "walletAddress", "signResult", "lastActionStatus", "lastError"],
+        (data) => {
+          if (data.lastTweetUrl) setTweetUrl(data.lastTweetUrl);
+          if (data.walletAddress) setWallet(data.walletAddress);
+          if (data.signResult) setSignature(data.signResult);
+          if (data.lastActionStatus) setStatus(data.lastActionStatus);
+          if (data.lastError) setErr(data.lastError);
+        }
+      );
+    };
+
+    load();
+    chrome.storage.onChanged.addListener(load);
+    return () => chrome.storage.onChanged.removeListener(load);
+  }, []);
 
   return (
-    <div style={{ minWidth: 220, minHeight: 100, padding: 20 }}>
-      <button onClick={changeBg}>Change Background Color</button>
+    <div style={{ padding: 16, display: "grid", gap: 12 }}>
+      <h2>Tweet Token Creator</h2>
+
+      <div><b>Tweet:</b> <br /> {tweetUrl || "-"}</div>
+      <div><b>Wallet:</b> <br /> {wallet || "Not connected"}</div>
+
+      <div><b>Status:</b> <br /> {status || "Idle"}</div>
+
+      {signature && (
+        <div>
+          <b>Signature:</b>
+          <textarea
+            readOnly
+            value={signature}
+            style={{ width: "100%", height: 80 }}
+          />
+        </div>
+      )}
+
+      {status === "error" && (
+        <div style={{ color: "red", whiteSpace: "pre-wrap" }}>
+          Error: {err}
+        </div>
+      )}
     </div>
   );
 }
-
-export default App;
