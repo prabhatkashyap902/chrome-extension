@@ -7,6 +7,22 @@ function injectInpage() {
   document.documentElement.appendChild(s);
 }
 
+// ✅ Get logged-in user's own username
+function getLoggedInXUsername() {
+  // This element always exists for the logged-in viewer
+  const profileLink = document.querySelector('a[data-testid="AppTabBar_Profile_Link"]');
+
+  if (!profileLink) return null;
+
+  const href = profileLink.getAttribute("href"); // "/username"
+
+  if (!href || !href.startsWith("/")) return null;
+
+  const parts = href.split("/").filter(Boolean); // ["username"]
+
+  return parts[0] || null;
+}
+
 function waitFor(selector, timeout = 10000) {
   return new Promise((resolve, reject) => {
     const start = Date.now();
@@ -24,54 +40,92 @@ function waitFor(selector, timeout = 10000) {
   });
 }
 
+function getTweetAuthor(tweet) {
+  // Find the container that includes @username
+  const userNameContainer = tweet.querySelector('div[data-testid="User-Name"]');
+
+  if (!userNameContainer) return null;
+
+  // Inside this container, find the @username exact element
+  const handleSpan = Array.from(userNameContainer.querySelectorAll("span"))
+    .map((s) => s.textContent.trim())
+    .find((txt) => txt.startsWith("@"));
+
+  if (!handleSpan) return null;
+
+  return handleSpan.replace("@", "").trim();
+}
+
+
+
 function addButton(tweet) {
   if (!tweet || tweet.dataset.ttcAdded) return;
-  tweet.dataset.ttcAdded = "1";
 
-  const timeElem = tweet.querySelector("time");
-  if (!timeElem) return;
+  // ✅ Get tweet author
+  const author = getTweetAuthor(tweet);
+  console.log("Tweet Author:", author);
+  if (!author) return;
 
-  const tweetUrl = timeElem.parentElement?.href;
-  if (!tweetUrl) return;
+  // ✅ Compare with logged-in user
+  chrome.storage.local.get("loggedInXUsername", (data) => {
+    const myUser = data.loggedInXUsername;
+    console.log("My user:", myUser);
 
-  const btn = document.createElement("button");
-  btn.innerText = "Create a token";
+    if (!myUser || author.toLowerCase() !== myUser.toLowerCase()) {
+      console.log("Not my tweet → skipping");
+      return;
+    }
 
-  Object.assign(btn.style, {
-    position: "absolute",
-    top: "4px",
-    right: "4px",
-    padding: "3px 10px",
-    background: "#1DA1F2",
-    color: "#fff",
-    fontSize: "12px",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-    zIndex: 99999
+    console.log("✅ This is my tweet! Adding button.");
+
+    tweet.dataset.ttcAdded = "1";
+
+    const timeElem = tweet.querySelector("time");
+    if (!timeElem) return;
+
+    const tweetUrl = timeElem.parentElement?.href;
+    if (!tweetUrl) return;
+
+    const btn = document.createElement("button");
+    btn.innerText = "Create a token";
+
+    Object.assign(btn.style, {
+      position: "absolute",
+      top: "4px",
+      right: "4px",
+      padding: "3px 10px",
+      background: "#1DA1F2",
+      color: "#fff",
+      fontSize: "12px",
+      border: "none",
+      borderRadius: "4px",
+      cursor: "pointer",
+      zIndex: 99999
+    });
+
+    tweet.style.position = "relative";
+    tweet.appendChild(btn);
+
+    btn.onclick = () => {
+      chrome.storage.local.set({ lastTweetUrl: tweetUrl });
+
+      injectInpage();
+
+      window.postMessage(
+        {
+          source: "TTC_CONTENT",
+          type: "TTC_CONNECT_AND_SIGN",
+          payload: { message: "Sign for: " + tweetUrl }
+        },
+        "*"
+      );
+
+      chrome.runtime.sendMessage({ action: "OPEN_POPUP" });
+    };
   });
-
-  tweet.style.position = "relative";
-  tweet.appendChild(btn);
-
-  btn.onclick = () => {
-    chrome.storage.local.set({ lastTweetUrl: tweetUrl });
-
-    injectInpage();
-
-    // ask inpage to connect & sign
-    window.postMessage(
-      {
-        source: "TTC_CONTENT",
-        type: "TTC_CONNECT_AND_SIGN",
-        payload: { message: "Sign for: " + tweetUrl }
-      },
-      "*"
-    );
-
-    chrome.runtime.sendMessage({ action: "OPEN_POPUP" });
-  };
 }
+
+
 
 // observe tweet loads
 const observer = new MutationObserver((mutations) => {
@@ -123,3 +177,13 @@ window.addEventListener("message", (event) => {
     chrome.runtime.sendMessage({ action: "OPEN_POPUP" });
   }
 });
+
+// ✅ Store logged-in username once the page is ready
+setTimeout(() => {
+  const myUser = getLoggedInXUsername();
+  console.log("Logged-in X username detected:", myUser);
+
+  chrome.storage.local.set({ loggedInXUsername: myUser || "" });
+}, 1500);
+
+
