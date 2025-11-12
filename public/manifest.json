@@ -2,11 +2,16 @@
   "manifest_version": 3,
   "name": "Tweet Token Creator",
   "version": "1.0.0",
+  "description": "Create Solana tokens from your tweets",
   "action": {
     "default_popup": "index.html"
   },
   "permissions": ["activeTab", "scripting", "storage"],
-  "host_permissions": ["https://x.com/*", "https://twitter.com/*"],
+  "host_permissions": [
+    "https://x.com/*",
+    "https://twitter.com/*",
+    "https://api.devnet.solana.com/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
@@ -19,8 +24,16 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["inpage.js"],
+      "resources": [
+        "inpage.js", 
+        "idl.json",
+        "libs/web3.iife.js",
+        "libs/spl-token.iife.js"
+      ],
       "matches": ["https://x.com/*", "https://twitter.com/*"]
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://api.devnet.solana.com;"
+  }
 }

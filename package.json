@@ -10,8 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
     "@reown/appkit": "^1.8.13",
     "@reown/appkit-adapter-solana": "^1.8.13",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.98.4",
+    "bs58": "^6.0.0",
+    "buffer": "^6.0.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "vite-plugin-static-copy": "^3.1.3"

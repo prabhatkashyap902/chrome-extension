@@ -1,189 +1,249 @@
+// Content script - runs on x.com/twitter.com
+console.log("[TTC Content] Script loaded");
+
+// Inject Solana libraries (IIFE bundles) and inpage script
 function injectInpage() {
-  if (document.getElementById("__ttc_inpage")) return;
-
-  const s = document.createElement("script");
-  s.src = chrome.runtime.getURL("inpage.js");
-  s.id = "__ttc_inpage";
-  document.documentElement.appendChild(s);
+  if (document.getElementById("__ttc_libs_injected")) return;
+  
+  // Mark as injected
+  const marker = document.createElement("div");
+  marker.id = "__ttc_libs_injected";
+  marker.style.display = "none";
+  document.documentElement.appendChild(marker);
+  
+  // Inject Solana web3.js IIFE bundle
+  const web3Script = document.createElement("script");
+  web3Script.src = chrome.runtime.getURL("libs/web3.iife.js");
+  web3Script.onload = () => {
+    console.log("[TTC Content] ✅ Solana web3.js loaded");
+    
+    // Inject SPL Token IIFE bundle
+    const splTokenScript = document.createElement("script");
+    splTokenScript.src = chrome.runtime.getURL("libs/spl-token.iife.js");
+    splTokenScript.onload = () => {
+      console.log("[TTC Content] ✅ SPL Token loaded");
+      
+      // Finally inject our inpage script
+      const inpageScript = document.createElement("script");
+      inpageScript.src = chrome.runtime.getURL("inpage.js");
+      inpageScript.id = "__ttc_inpage";
+      inpageScript.onload = () => {
+        console.log("[TTC Content] ✅ Inpage script loaded");
+      };
+      document.documentElement.appendChild(inpageScript);
+    };
+    document.documentElement.appendChild(splTokenScript);
+  };
+  document.documentElement.appendChild(web3Script);
 }
 
-// ✅ Get logged-in user's own username
-function getLoggedInXUsername() {
-  // This element always exists for the logged-in viewer
+// Get logged-in user's username
+function getMyUsername() {
   const profileLink = document.querySelector('a[data-testid="AppTabBar_Profile_Link"]');
-
   if (!profileLink) return null;
-
-  const href = profileLink.getAttribute("href"); // "/username"
-
+  
+  const href = profileLink.getAttribute("href");
   if (!href || !href.startsWith("/")) return null;
-
-  const parts = href.split("/").filter(Boolean); // ["username"]
-
-  return parts[0] || null;
+  
+  const username = href.split("/").filter(Boolean)[0];
+  return username || null;
 }
 
-function waitFor(selector, timeout = 10000) {
-  return new Promise((resolve, reject) => {
-    const start = Date.now();
-    const loop = setInterval(() => {
-      const el = document.querySelector(selector);
-      if (el) {
-        clearInterval(loop);
-        resolve(el);
-      }
-      if (Date.now() - start > timeout) {
-        clearInterval(loop);
-        reject("Timeout: " + selector);
-      }
-    }, 200);
-  });
-}
-
-function getTweetAuthor(tweet) {
-  // Find the container that includes @username
-  const userNameContainer = tweet.querySelector('div[data-testid="User-Name"]');
-
+// Get tweet author username
+function getTweetAuthor(tweetElement) {
+  const userNameContainer = tweetElement.querySelector('div[data-testid="User-Name"]');
   if (!userNameContainer) return null;
-
-  // Inside this container, find the @username exact element
+  
   const handleSpan = Array.from(userNameContainer.querySelectorAll("span"))
-    .map((s) => s.textContent.trim())
-    .find((txt) => txt.startsWith("@"));
-
+    .map(s => s.textContent.trim())
+    .find(txt => txt.startsWith("@"));
+  
   if (!handleSpan) return null;
-
   return handleSpan.replace("@", "").trim();
 }
 
-
-
-function addButton(tweet) {
-  if (!tweet || tweet.dataset.ttcAdded) return;
-
-  // ✅ Get tweet author
-  const author = getTweetAuthor(tweet);
-  console.log("Tweet Author:", author);
+// Add "Create a token" button to user's own tweets
+function addTokenButton(tweetElement) {
+  // Skip if already added
+  if (tweetElement.dataset.ttcProcessed) return;
+  tweetElement.dataset.ttcProcessed = "true";
+  
+  const author = getTweetAuthor(tweetElement);
   if (!author) return;
-
-  // ✅ Compare with logged-in user
-  chrome.storage.local.get("loggedInXUsername", (data) => {
-    const myUser = data.loggedInXUsername;
-    console.log("My user:", myUser);
-
-    if (!myUser || author.toLowerCase() !== myUser.toLowerCase()) {
-      console.log("Not my tweet → skipping");
+  
+  // Get my username from storage
+  chrome.storage.local.get("myUsername", (data) => {
+    const myUsername = data.myUsername;
+    
+    // Only add button to MY tweets
+    if (!myUsername || author.toLowerCase() !== myUsername.toLowerCase()) {
       return;
     }
-
-    console.log("✅ This is my tweet! Adding button.");
-
-    tweet.dataset.ttcAdded = "1";
-
-    const timeElem = tweet.querySelector("time");
-    if (!timeElem) return;
-
-    const tweetUrl = timeElem.parentElement?.href;
-    if (!tweetUrl) return;
-
-    const btn = document.createElement("button");
-    btn.innerText = "Create a token";
-
-    Object.assign(btn.style, {
-      position: "absolute",
-      top: "4px",
-      right: "4px",
-      padding: "3px 10px",
-      background: "#1DA1F2",
-      color: "#fff",
-      fontSize: "12px",
-      border: "none",
-      borderRadius: "4px",
-      cursor: "pointer",
-      zIndex: 99999
-    });
-
-    tweet.style.position = "relative";
-    tweet.appendChild(btn);
-
-    btn.onclick = () => {
-      chrome.storage.local.set({ lastTweetUrl: tweetUrl });
-
-      injectInpage();
-
-      window.postMessage(
-        {
-          source: "TTC_CONTENT",
-          type: "TTC_CONNECT_AND_SIGN",
-          payload: { message: "Sign for: " + tweetUrl }
-        },
-        "*"
-      );
-
+    
+    console.log("[TTC Content] Adding button to my tweet");
+    
+    // Get tweet text and URL
+    const tweetTextElem = tweetElement.querySelector('[data-testid="tweetText"]');
+    const tweetText = tweetTextElem ? tweetTextElem.textContent : "";
+    
+    const timeElem = tweetElement.querySelector("time");
+    const tweetUrl = timeElem && timeElem.parentElement ? timeElem.parentElement.href : "";
+    
+    // Create button
+    const button = document.createElement("button");
+    button.textContent = "Create a token";
+    button.style.cssText = `
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 6px 12px;
+      background: #1DA1F2;
+      color: white;
+      border: none;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      z-index: 10;
+    `;
+    
+    tweetElement.style.position = "relative";
+    tweetElement.appendChild(button);
+    
+    // Button click handler
+    button.onclick = async () => {
+      console.log("[TTC Content] 🔘 Create token button clicked");
+      
+      // Generate token name and symbol from tweet
+      const tokenName = tweetText.slice(0, 32) || "My Token";
+      const tokenSymbol = (tweetText.slice(0, 4).toUpperCase().replace(/[^A-Z]/g, '') || "TKN");
+      
+      // Set status to creating
+      chrome.storage.local.set({
+        status: "Creating token...",
+        walletAddress: "",
+        txHash: "",
+        tokenName: "",
+        tokenSymbol: "",
+        tokenMint: "",
+        error: ""
+      });
+      
+      // Open popup
       chrome.runtime.sendMessage({ action: "OPEN_POPUP" });
+      
+      try {
+        // Load IDL
+        const idlUrl = chrome.runtime.getURL("idl.json");
+        const idlResponse = await fetch(idlUrl);
+        const idl = await idlResponse.json();
+        
+        // ⚠️ REPLACE THIS WITH YOUR ACTUAL PROGRAM ID FROM YOUR SMART CONTRACT
+        const PROGRAM_ID = "CnfqUGYuKinSjAWU2abZBexMS3eHBG3vVKx9t5RR8mnu";
+        
+        console.log("[TTC Content] Program ID:", PROGRAM_ID);
+        
+        // Inject inpage script
+        injectInpage();
+        
+        // Wait for inpage to load
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Send message to inpage to create token
+        console.log("[TTC Content] 📤 Sending create token request to inpage...");
+        window.postMessage({
+          source: "TTC_CONTENT",
+          type: "CREATE_TOKEN",
+          payload: {
+            tweetText,
+            tweetUrl,
+            tokenName,
+            tokenSymbol,
+            idl,
+            programId: PROGRAM_ID
+          }
+        }, "*");
+        
+      } catch (error) {
+        console.error("[TTC Content] ❌ Error:", error);
+        chrome.storage.local.set({
+          status: "error",
+          error: error.message
+        });
+      }
     };
   });
 }
 
-
-
-// observe tweet loads
-const observer = new MutationObserver((mutations) => {
-  mutations.forEach((m) => {
-    m.addedNodes.forEach((node) => {
-      if (node.nodeType === 1) {
-        if (node.matches?.('article[data-testid="tweet"]')) addButton(node);
-        node.querySelectorAll?.('article[data-testid="tweet"]').forEach(addButton);
-      }
-    });
-  });
+// Watch for tweets being added to the page
+const observer = new MutationObserver(() => {
+  const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+  tweets.forEach(addTokenButton);
 });
 
-observer.observe(document.body, { childList: true, subtree: true });
-
-// initial scan
-waitFor('article[data-testid="tweet"]').then(() => {
-  document.querySelectorAll('article[data-testid="tweet"]').forEach(addButton);
+observer.observe(document.body, {
+  childList: true,
+  subtree: true
 });
 
-// receive from inpage
-window.addEventListener("message", (event) => {
-  if (event.source !== window) return;
-  if (event.data.source !== "TTC_INPAGE") return;
-
-  const { type, payload, error } = event.data;
-
-  if (type === "TTC_CONNECT_AND_SIGN_DONE") {
-    chrome.storage.local.set({
-      phantomConnected: true,
-      walletAddress: payload.publicKey,
-      signResult: payload.signature,
-      lastActionStatus: "success",
-      lastError: ""
-    });
-
-    chrome.runtime.sendMessage({ action: "OPEN_POPUP" });
-  }
-
-  if (type === "TTC_CONNECT_AND_SIGN_ERROR") {
-    chrome.storage.local.set({
-      phantomConnected: false,
-      walletAddress: "",
-      signResult: "",
-      lastActionStatus: "error",
-      lastError: error
-    });
-
-    chrome.runtime.sendMessage({ action: "OPEN_POPUP" });
-  }
-});
-
-// ✅ Store logged-in username once the page is ready
+// Process existing tweets
 setTimeout(() => {
-  const myUser = getLoggedInXUsername();
-  console.log("Logged-in X username detected:", myUser);
+  const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+  tweets.forEach(addTokenButton);
+}, 1000);
 
-  chrome.storage.local.set({ loggedInXUsername: myUser || "" });
+// Store my username
+setTimeout(() => {
+  const myUsername = getMyUsername();
+  if (myUsername) {
+    console.log("[TTC Content] My username:", myUsername);
+    chrome.storage.local.set({ myUsername });
+  }
 }, 1500);
 
-
+// Listen for messages from inpage
+window.addEventListener("message", (event) => {
+  if (event.source !== window) return;
+  if (!event.data || !event.data.source) return;
+  
+  // Proxy RPC requests from inpage to background
+  if (event.data.source === "TTC_INPAGE" && event.data.type === "RPC_REQUEST") {
+    chrome.runtime.sendMessage(
+      { action: "SOLANA_RPC", payload: event.data.payload },
+      (response) => {
+        window.postMessage({
+          source: "TTC_CONTENT",
+          type: "RPC_RESPONSE",
+          requestId: event.data.requestId,
+          response
+        }, "*");
+      }
+    );
+    return;
+  }
+  
+  // Handle success
+  if (event.data.source === "TTC_INPAGE" && event.data.type === "TOKEN_CREATED") {
+    console.log("[TTC Content] 🎉 Token created successfully!");
+    chrome.storage.local.set({
+      status: "success",
+      walletAddress: event.data.walletAddress,
+      txHash: event.data.txHash,
+      tokenName: event.data.tokenName,
+      tokenSymbol: event.data.tokenSymbol,
+      tokenMint: event.data.tokenMint,
+      error: ""
+    });
+    chrome.runtime.sendMessage({ action: "OPEN_POPUP" });
+  }
+  
+  // Handle error
+  if (event.data.source === "TTC_INPAGE" && event.data.type === "TOKEN_ERROR") {
+    console.error("[TTC Content] ❌ Token creation failed:", event.data.error);
+    chrome.storage.local.set({
+      status: "error",
+      error: event.data.error
+    });
+    chrome.runtime.sendMessage({ action: "OPEN_POPUP" });
+  }
+});

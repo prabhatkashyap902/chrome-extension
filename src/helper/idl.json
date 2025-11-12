@@ -1,0 +1,4424 @@
+{
+  "metadata": {
+    "name": "yappr",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor",
+    "address": "CnfqUGYuKinSjAWU2abZBexMS3eHBG3vVKx9t5RR8mnu"
+  },
+  "docs": [
+    "Enum for trade types"
+  ],
+  "instructions": [
+    {
+      "name": "buy_tokens",
+      "docs": [
+        "Buy tokens using the pump.fun bonding curve with Pyth price integration"
+      ],
+      "discriminator": [
+        189,
+        21,
+        230,
+        133,
+        247,
+        2,
+        110,
+        42
+      ],
+      "accounts": [
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_mint",
+          "writable": true
+        },
+        {
+          "name": "factory_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  97,
+                  99,
+                  116,
+                  111,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                  95,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "sale_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  108,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sale_config.authority",
+                "account": "SaleConfig"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "buyer"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "kol_data",
+          "writable": true,
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  107,
+                  111,
+                  108,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "kol_master",
+          "docs": [
+            "Optional master KOL allocation for buyer (unchecked; only read if valid)"
+          ],
+          "optional": true
+        },
+        {
+          "name": "public_user_data",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  117,
+                  98,
+                  108,
+                  105,
+                  99,
+                  95,
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dev_wallet",
+          "writable": true
+        },
+        {
+          "name": "platform_vault",
+          "docs": [
+            "PDA vault to collect platform fees (pre-initialized during factory init)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  116,
+                  102,
+                  111,
+                  114,
+                  109,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "factory_config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_cache",
+          "docs": [
+            "Price cache PDA storing last SOL/USD price"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101,
+                  95,
+                  99,
+                  97,
+                  99,
+                  104,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "factory_config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "sol_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "calculate_sol_for_tokens",
+      "docs": [
+        "VIEW FUNCTION: Calculate SOL received for token input (read-only)",
+        "Frontend can call this to preview sell transactions"
+      ],
+      "discriminator": [
+        112,
+        23,
+        72,
+        44,
+        118,
+        249,
+        163,
+        254
+      ],
+      "accounts": [
+        {
+          "name": "token_mint",
+          "docs": [
+            "Token mint to calculate for"
+          ]
+        },
+        {
+          "name": "sale_config",
+          "docs": [
+            "Sale configuration account (read-only)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  108,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sale_config.authority",
+                "account": "SaleConfig"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "factory_config",
+          "docs": [
+            "Factory configuration for price mode"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  97,
+                  99,
+                  116,
+                  111,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                  95,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "public_user_data",
+          "docs": [
+            "Public user data for tracking user's total SOL spent (optional for UI calculations)"
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  117,
+                  98,
+                  108,
+                  105,
+                  99,
+                  95,
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user"
+        },
+        {
+          "name": "price_cache",
+          "docs": [
+            "Price cache PDA storing last SOL/USD price"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101,
+                  95,
+                  99,
+                  97,
+                  99,
+                  104,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "factory_config"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "token_amount",
+          "type": "u64"
+        }
+      ],
+      "returns": "u64"
+    },
+    {
+      "name": "calculate_tokens_for_sol",
+      "docs": [
+        "VIEW FUNCTION: Calculate tokens received for SOL input (read-only)",
+        "Frontend can call this to preview buy transactions"
+      ],
+      "discriminator": [
+        29,
+        110,
+        119,
+        122,
+        103,
+        131,
+        97,
+        43
+      ],
+      "accounts": [
+        {
+          "name": "token_mint",
+          "docs": [
+            "Token mint to calculate for"
+          ]
+        },
+        {
+          "name": "sale_config",
+          "docs": [
+            "Sale configuration account (read-only)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  108,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sale_config.authority",
+                "account": "SaleConfig"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "factory_config",
+          "docs": [
+            "Factory configuration for price mode"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  97,
+                  99,
+                  116,
+                  111,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                  95,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_cache",
+          "docs": [
+            "Price cache PDA storing last SOL/USD price"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101,
+                  95,
+                  99,
+                  97,
+                  99,
+                  104,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "factory_config"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "sol_amount",
+          "type": "u64"
+        }
+      ],
+      "returns": "u64"
+    },
+    {
+      "name": "close_factory",
+      "docs": [
+        "Close the factory configuration and platform vault PDAs (admin only)",
+        "After this, you can re-run initialize_factory."
+      ],
+      "discriminator": [
+        228,
+        44,
+        252,
+        93,
+        14,
+        64,
+        13,
+        7
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "factory_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  97,
+                  99,
+                  116,
+                  111,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                  95,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "platform_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  116,
+                  102,
+                  111,
+                  114,
+                  109,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "factory_config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_cache",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101,
+                  95,
+                  99,
+                  97,
+                  99,
+                  104,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "factory_config"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_token_sale",
+      "docs": [
+        "Create a new token sale with pump.fun bonding curve mechanics",
+        "Users call this to launch their own tokens with metadata"
+      ],
+      "discriminator": [
+        140,
+        21,
+        70,
+        198,
+        240,
+        52,
+        85,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "dev_wallet",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "factory_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  97,
+                  99,
+                  116,
+                  111,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                  95,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_mint",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "sale_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  108,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "dev_wallet"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dev_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "dev_wallet"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "metadata_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "const",
+                "value": [
+                  11,
+                  112,
+                  101,
+                  177,
+                  227,
+                  209,
+                  124,
+                  69,
+                  56,
+                  157,
+                  82,
+                  127,
+                  107,
+                  4,
+                  195,
+                  205,
+                  88,
+                  184,
+                  108,
+                  115,
+                  26,
+                  160,
+                  253,
+                  181,
+                  73,
+                  182,
+                  209,
+                  188,
+                  3,
+                  248,
+                  41,
+                  70
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                11,
+                112,
+                101,
+                177,
+                227,
+                209,
+                124,
+                69,
+                56,
+                157,
+                82,
+                127,
+                107,
+                4,
+                195,
+                205,
+                88,
+                184,
+                108,
+                115,
+                26,
+                160,
+                253,
+                181,
+                73,
+                182,
+                209,
+                188,
+                3,
+                248,
+                41,
+                70
+              ]
+            }
+          }
+        },
+        {
+          "name": "master_edition_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "const",
+                "value": [
+                  11,
+                  112,
+                  101,
+                  177,
+                  227,
+                  209,
+                  124,
+                  69,
+                  56,
+                  157,
+                  82,
+                  127,
+                  107,
+                  4,
+                  195,
+                  205,
+                  88,
+                  184,
+                  108,
+                  115,
+                  26,
+                  160,
+                  253,
+                  181,
+                  73,
+                  182,
+                  209,
+                  188,
+                  3,
+                  248,
+                  41,
+                  70
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  100,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                11,
+                112,
+                101,
+                177,
+                227,
+                209,
+                124,
+                69,
+                56,
+                157,
+                82,
+                127,
+                107,
+                4,
+                195,
+                205,
+                88,
+                184,
+                108,
+                115,
+                26,
+                160,
+                253,
+                181,
+                73,
+                182,
+                209,
+                188,
+                3,
+                248,
+                41,
+                70
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_metadata_program"
+        },
+        {
+          "name": "price_cache",
+          "docs": [
+            "Price cache PDA storing last SOL/USD price"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101,
+                  95,
+                  99,
+                  97,
+                  99,
+                  104,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "factory_config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "symbol",
+          "type": "string"
+        },
+        {
+          "name": "uri",
+          "type": "string"
+        },
+        {
+          "name": "dev_sol_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "estimate_dev_tokens_for_sol",
+      "docs": [
+        "VIEW FUNCTION: Estimate dev tokens for SOL input before token creation",
+        "Uses the initial virtual AMM state and applies no fees (dev creation path)"
+      ],
+      "discriminator": [
+        95,
+        121,
+        130,
+        137,
+        118,
+        132,
+        152,
+        242
+      ],
+      "accounts": [
+        {
+          "name": "factory_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  97,
+                  99,
+                  116,
+                  111,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                  95,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_cache",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101,
+                  95,
+                  99,
+                  97,
+                  99,
+                  104,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "factory_config"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "sol_amount",
+          "type": "u64"
+        }
+      ],
+      "returns": "u64"
+    },
+    {
+      "name": "estimate_tokens_for_sol_amount",
+      "docs": [
+        "COMPREHENSIVE VIEW FUNCTION: Estimate tokens received for SOL input",
+        "Handles both existing tokens and new token creation scenarios",
+        "Returns detailed estimation including fees and pricing information"
+      ],
+      "discriminator": [
+        7,
+        84,
+        84,
+        184,
+        26,
+        43,
+        217,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "token_mint",
+          "docs": [
+            "Token mint to estimate for (can be uninitialized for new tokens)"
+          ]
+        },
+        {
+          "name": "sale_config",
+          "docs": [
+            "Sale configuration account (optional - only needed for existing tokens)",
+            "For new tokens, this will be None"
+          ],
+          "optional": true
+        },
+        {
+          "name": "factory_config",
+          "docs": [
+            "Factory configuration for price mode"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  97,
+                  99,
+                  116,
+                  111,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                  95,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_cache",
+          "docs": [
+            "Price cache PDA storing last SOL/USD price"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101,
+                  95,
+                  99,
+                  97,
+                  99,
+                  104,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "factory_config"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "sol_amount",
+          "type": "u64"
+        }
+      ],
+      "returns": {
+        "defined": {
+          "name": "TokenEstimation"
+        }
+      }
+    },
+    {
+      "name": "get_allocations",
+      "docs": [
+        "VIEW FUNCTION: Get allocation summary for a given user and mint"
+      ],
+      "discriminator": [
+        118,
+        230,
+        193,
+        153,
+        145,
+        165,
+        5,
+        209
+      ],
+      "accounts": [
+        {
+          "name": "token_mint",
+          "docs": [
+            "Token mint to query"
+          ]
+        },
+        {
+          "name": "sale_config",
+          "docs": [
+            "Sale configuration for this mint"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  108,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sale_config.authority",
+                "account": "SaleConfig"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user"
+        },
+        {
+          "name": "kol_data",
+          "docs": [
+            "Optional KOL data account for this user and mint (may be uninitialized)"
+          ],
+          "optional": true
+        },
+        {
+          "name": "kol_master",
+          "docs": [
+            "Optional master KOL data for the user (unchecked; validated at runtime)"
+          ],
+          "optional": true
+        },
+        {
+          "name": "public_user_data",
+          "docs": [
+            "Optional Public user data account for per-user SOL cap tracking",
+            "Use UncheckedAccount so callers may pass the PDA even if not yet initialized.",
+            "We'll safely read it only if it exists and is owned by this program."
+          ],
+          "optional": true
+        }
+      ],
+      "args": [],
+      "returns": {
+        "defined": {
+          "name": "AllocationSummary"
+        }
+      }
+    },
+    {
+      "name": "initialize_factory",
+      "docs": [
+        "Initialize the token factory with platform configuration",
+        "Called once during deployment by Yappr organization"
+      ],
+      "discriminator": [
+        179,
+        64,
+        75,
+        250,
+        39,
+        254,
+        240,
+        178
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "factory_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  97,
+                  99,
+                  116,
+                  111,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                  95,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "platform_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  116,
+                  102,
+                  111,
+                  114,
+                  109,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "factory_config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_cache",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101,
+                  95,
+                  99,
+                  97,
+                  99,
+                  104,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "factory_config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "platform_wallet",
+          "type": "pubkey"
+        },
+        {
+          "name": "backend_authority",
+          "type": "pubkey"
+        },
+        {
+          "name": "kol_phase_duration",
+          "type": "u64"
+        },
+        {
+          "name": "migration_threshold",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "refresh_price",
+      "docs": [
+        "Refresh the cached SOL/USD price using a Pyth PriceUpdateV2 account"
+      ],
+      "discriminator": [
+        253,
+        61,
+        142,
+        248,
+        9,
+        32,
+        158,
+        32
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "factory_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  97,
+                  99,
+                  116,
+                  111,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                  95,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_price_feed"
+        },
+        {
+          "name": "price_cache",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101,
+                  95,
+                  99,
+                  97,
+                  99,
+                  104,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "factory_config"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "sell_tokens",
+      "docs": [
+        "Sell tokens back to the bonding curve"
+      ],
+      "discriminator": [
+        114,
+        242,
+        25,
+        12,
+        62,
+        126,
+        92,
+        2
+      ],
+      "accounts": [
+        {
+          "name": "seller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_mint",
+          "writable": true
+        },
+        {
+          "name": "sale_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  108,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sale_config.authority",
+                "account": "SaleConfig"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sender_token_account",
+          "writable": true
+        },
+        {
+          "name": "kol_data",
+          "writable": true,
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  107,
+                  111,
+                  108,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "seller"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "public_user_data",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  117,
+                  98,
+                  108,
+                  105,
+                  99,
+                  95,
+                  117,
+                  115,
+                  101,
+                  114,
+                  95,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "seller"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "factory_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  97,
+                  99,
+                  116,
+                  111,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                  95,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "dev_wallet",
+          "writable": true
+        },
+        {
+          "name": "platform_vault",
+          "docs": [
+            "PDA vault to collect platform fees (pre-initialized during factory init)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  116,
+                  102,
+                  111,
+                  114,
+                  109,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "factory_config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_cache",
+          "docs": [
+            "Price cache PDA storing last SOL/USD price"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101,
+                  95,
+                  99,
+                  97,
+                  99,
+                  104,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "factory_config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "tokens_to_sell",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_phase",
+      "docs": [
+        "Set the current phase of the token sale (KOL, Public)"
+      ],
+      "discriminator": [
+        111,
+        105,
+        112,
+        240,
+        6,
+        217,
+        210,
+        215
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "sale_config"
+          ]
+        },
+        {
+          "name": "token_mint"
+        },
+        {
+          "name": "sale_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  108,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "phase",
+          "type": {
+            "defined": {
+              "name": "Phase"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_kol_allocation",
+      "docs": [
+        "Update master KOL allocation after verifying backend signature"
+      ],
+      "discriminator": [
+        247,
+        160,
+        253,
+        235,
+        111,
+        182,
+        225,
+        151
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "factory_config",
+          "docs": [
+            "Global factory config provides backend authority"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  97,
+                  99,
+                  116,
+                  111,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                  95,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "kol_authority"
+        },
+        {
+          "name": "kol_master",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  107,
+                  111,
+                  108,
+                  95,
+                  109,
+                  97,
+                  115,
+                  116,
+                  101,
+                  114,
+                  95,
+                  118,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "kol_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "instructions",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "allocation",
+          "type": "u64"
+        },
+        {
+          "name": "twitter_id",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "update_migration_threshold",
+      "docs": [
+        "Update the migration threshold for a token sale (admin function)"
+      ],
+      "discriminator": [
+        100,
+        212,
+        218,
+        54,
+        219,
+        208,
+        36,
+        40
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "sale_config"
+          ]
+        },
+        {
+          "name": "token_mint"
+        },
+        {
+          "name": "sale_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  108,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_threshold",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "update_price_mode",
+      "docs": [
+        "Update price validation mode (admin only)",
+        "strict_mode: true = no fallbacks, false = use fallback pricing"
+      ],
+      "discriminator": [
+        244,
+        201,
+        177,
+        12,
+        196,
+        211,
+        89,
+        99
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "factory_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  97,
+                  99,
+                  116,
+                  111,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                  95,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "strict_mode",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_platform_fees",
+      "docs": [
+        "Withdraw accumulated platform fees from PDA vault to configured platform wallet"
+      ],
+      "discriminator": [
+        87,
+        24,
+        138,
+        122,
+        62,
+        146,
+        186,
+        199
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "factory_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  97,
+                  99,
+                  116,
+                  111,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                  95,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "platform_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  116,
+                  102,
+                  111,
+                  114,
+                  109,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "factory_config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "platform_wallet"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_to_migration",
+      "docs": [
+        "Withdraw tokens (mint to destination) and lamports from sale to migration vaults (admin-only)"
+      ],
+      "discriminator": [
+        175,
+        85,
+        115,
+        25,
+        249,
+        27,
+        203,
+        23
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true
+        },
+        {
+          "name": "token_mint"
+        },
+        {
+          "name": "sale_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  97,
+                  108,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sale_config.authority",
+                "account": "SaleConfig"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "factory_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  97,
+                  99,
+                  116,
+                  111,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                  95,
+                  118,
+                  50
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "to_base_ata",
+          "writable": true
+        },
+        {
+          "name": "to_wsol_ata",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_x",
+          "type": "u64"
+        },
+        {
+          "name": "amount_y_lamports",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "FactoryConfig",
+      "discriminator": [
+        29,
+        197,
+        255,
+        232,
+        22,
+        128,
+        67,
+        26
+      ]
+    },
+    {
+      "name": "KolData",
+      "discriminator": [
+        18,
+        59,
+        232,
+        182,
+        39,
+        44,
+        43,
+        209
+      ]
+    },
+    {
+      "name": "KolMasterData",
+      "discriminator": [
+        193,
+        54,
+        125,
+        38,
+        4,
+        179,
+        143,
+        149
+      ]
+    },
+    {
+      "name": "PlatformVault",
+      "discriminator": [
+        223,
+        22,
+        224,
+        48,
+        29,
+        125,
+        8,
+        80
+      ]
+    },
+    {
+      "name": "PriceCache",
+      "discriminator": [
+        198,
+        211,
+        186,
+        101,
+        228,
+        22,
+        101,
+        190
+      ]
+    },
+    {
+      "name": "PriceUpdateV2",
+      "discriminator": [
+        34,
+        241,
+        35,
+        99,
+        157,
+        126,
+        244,
+        205
+      ]
+    },
+    {
+      "name": "PublicUserData",
+      "discriminator": [
+        230,
+        63,
+        48,
+        223,
+        31,
+        207,
+        198,
+        174
+      ]
+    },
+    {
+      "name": "SaleConfig",
+      "discriminator": [
+        86,
+        47,
+        71,
+        156,
+        87,
+        152,
+        149,
+        246
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "KolPhaseStarted",
+      "discriminator": [
+        216,
+        195,
+        120,
+        225,
+        11,
+        160,
+        102,
+        210
+      ]
+    },
+    {
+      "name": "MasterKolAllocationUpdated",
+      "discriminator": [
+        97,
+        219,
+        174,
+        5,
+        100,
+        25,
+        126,
+        91
+      ]
+    },
+    {
+      "name": "MigrationThresholdUpdated",
+      "discriminator": [
+        47,
+        60,
+        218,
+        76,
+        171,
+        113,
+        145,
+        135
+      ]
+    },
+    {
+      "name": "MigrationTriggered",
+      "discriminator": [
+        95,
+        32,
+        44,
+        77,
+        244,
+        159,
+        125,
+        57
+      ]
+    },
+    {
+      "name": "PhaseChanged",
+      "discriminator": [
+        178,
+        201,
+        67,
+        222,
+        208,
+        36,
+        213,
+        219
+      ]
+    },
+    {
+      "name": "PhaseTransition",
+      "discriminator": [
+        9,
+        50,
+        154,
+        145,
+        224,
+        23,
+        108,
+        192
+      ]
+    },
+    {
+      "name": "PriceFeedWarning",
+      "discriminator": [
+        75,
+        67,
+        151,
+        44,
+        224,
+        199,
+        192,
+        89
+      ]
+    },
+    {
+      "name": "PriceModeUpdated",
+      "discriminator": [
+        36,
+        230,
+        197,
+        62,
+        11,
+        119,
+        247,
+        246
+      ]
+    },
+    {
+      "name": "PublicPhaseStarted",
+      "discriminator": [
+        24,
+        47,
+        132,
+        203,
+        173,
+        132,
+        31,
+        149
+      ]
+    },
+    {
+      "name": "TokenCreated",
+      "discriminator": [
+        236,
+        19,
+        41,
+        255,
+        130,
+        78,
+        147,
+        172
+      ]
+    },
+    {
+      "name": "TokenPurchased",
+      "discriminator": [
+        3,
+        73,
+        186,
+        50,
+        15,
+        181,
+        213,
+        37
+      ]
+    },
+    {
+      "name": "TokenSold",
+      "discriminator": [
+        88,
+        61,
+        1,
+        247,
+        185,
+        6,
+        252,
+        86
+      ]
+    },
+    {
+      "name": "TradeExecuted",
+      "discriminator": [
+        41,
+        110,
+        64,
+        129,
+        60,
+        79,
+        179,
+        80
+      ]
+    },
+    {
+      "name": "TransactionLimitWarning",
+      "discriminator": [
+        193,
+        128,
+        254,
+        189,
+        72,
+        200,
+        166,
+        229
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 10096,
+      "name": "Unauthorized",
+      "msg": "Unauthorized action - caller does not have required permissions"
+    },
+    {
+      "code": 10097,
+      "name": "InvalidBackendSignature",
+      "msg": "Invalid backend signature for KOL operation"
+    },
+    {
+      "code": 10098,
+      "name": "KolDataNotFound",
+      "msg": "KOL data not found for this phase"
+    },
+    {
+      "code": 10352,
+      "name": "InvalidTokenAmount",
+      "msg": "Invalid token amount - must be greater than zero"
+    },
+    {
+      "code": 10353,
+      "name": "InvalidTokenInfo",
+      "msg": "Invalid token name or symbol - check length requirements"
+    },
+    {
+      "code": 10354,
+      "name": "InvalidMetadataUri",
+      "msg": "Invalid metadata URI - must be valid URL format"
+    },
+    {
+      "code": 10355,
+      "name": "InvalidMetadataAccount",
+      "msg": "Invalid metadata account - Metaplex validation failed"
+    },
+    {
+      "code": 10356,
+      "name": "InvalidAccount",
+      "msg": "Invalid account - account validation failed"
+    },
+    {
+      "code": 10608,
+      "name": "CapExceeded",
+      "msg": "Cap exceeded - operation would exceed allocation limits"
+    },
+    {
+      "code": 10609,
+      "name": "TransactionLimitExceeded",
+      "msg": "Transaction exceeds per-transaction limit"
+    },
+    {
+      "code": 10610,
+      "name": "AllocationTooLarge",
+      "msg": "The specified allocation is too large for this KOL"
+    },
+    {
+      "code": 10611,
+      "name": "ExceedsMigrationCap",
+      "msg": "Transaction would exceed migration threshold maximum ($100k)"
+    },
+    {
+      "code": 10864,
+      "name": "AlreadyMigrated",
+      "msg": "Tokens have already been migrated to AMM"
+    },
+    {
+      "code": 10865,
+      "name": "InvalidPhase",
+      "msg": "Operation not allowed in current phase"
+    },
+    {
+      "code": 10866,
+      "name": "KolPhaseExpired",
+      "msg": "KOL phase has expired"
+    },
+    {
+      "code": 10867,
+      "name": "MigrationNotReady",
+      "msg": "Migration not ready - threshold not reached"
+    },
+    {
+      "code": 11120,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds in treasury"
+    },
+    {
+      "code": 11121,
+      "name": "InvalidPaymentAmount",
+      "msg": "Invalid payment amount"
+    },
+    {
+      "code": 11122,
+      "name": "SlippageExceeded",
+      "msg": "Slippage tolerance exceeded"
+    },
+    {
+      "code": 11376,
+      "name": "InvalidPriceFeed",
+      "msg": "Invalid or corrupted price feed"
+    },
+    {
+      "code": 11377,
+      "name": "StalePriceFeed",
+      "msg": "Price feed data is stale or outdated"
+    },
+    {
+      "code": 11378,
+      "name": "EmptyPriceFeed",
+      "msg": "Price feed account is empty or too small"
+    },
+    {
+      "code": 11379,
+      "name": "InvalidPrice",
+      "msg": "Price feed returned invalid or negative price"
+    },
+    {
+      "code": 11380,
+      "name": "PriceFeedNotFound",
+      "msg": "Price feed account not found"
+    },
+    {
+      "code": 11632,
+      "name": "Overflow",
+      "msg": "Arithmetic overflow in calculation"
+    },
+    {
+      "code": 11633,
+      "name": "DivisionByZero",
+      "msg": "Division by zero attempted"
+    },
+    {
+      "code": 11634,
+      "name": "Underflow",
+      "msg": "Result underflow - calculation would result in negative value"
+    },
+    {
+      "code": 11635,
+      "name": "PrecisionLoss",
+      "msg": "Precision loss in calculation"
+    },
+    {
+      "code": 11888,
+      "name": "InvalidFactoryConfig",
+      "msg": "Invalid factory configuration"
+    },
+    {
+      "code": 11889,
+      "name": "InvalidSaleConfig",
+      "msg": "Invalid sale configuration"
+    },
+    {
+      "code": 11890,
+      "name": "InvalidMigrationThreshold",
+      "msg": "Invalid migration threshold - must be greater than zero"
+    },
+    {
+      "code": 11891,
+      "name": "InvalidKolPhaseDuration",
+      "msg": "Invalid KOL phase duration"
+    },
+    {
+      "code": 12144,
+      "name": "MetaplexCreationFailed",
+      "msg": "Metaplex token metadata creation failed"
+    },
+    {
+      "code": 12145,
+      "name": "MeteoraMigrationFailed",
+      "msg": "Meteora migration setup failed"
+    },
+    {
+      "code": 12146,
+      "name": "MigrationFailed",
+      "msg": "Migration to AMM failed"
+    },
+    {
+      "code": 12147,
+      "name": "SplTokenOperationFailed",
+      "msg": "SPL token operation failed"
+    },
+    {
+      "code": 12148,
+      "name": "AtaCreationFailed",
+      "msg": "Associated token account creation failed"
+    },
+    {
+      "code": 12400,
+      "name": "BondingCurveCalculationFailed",
+      "msg": "Bonding curve calculation failed"
+    },
+    {
+      "code": 12401,
+      "name": "InvalidCurveProgress",
+      "msg": "Invalid curve progress - must be between 0 and 1"
+    },
+    {
+      "code": 12402,
+      "name": "CurveSupplyExhausted",
+      "msg": "Curve supply exhausted"
+    },
+    {
+      "code": 12403,
+      "name": "InvalidTokensForSolAmount",
+      "msg": "Invalid tokens for SOL amount"
+    },
+    {
+      "code": 12404,
+      "name": "TooManyIterations",
+      "msg": "Too many iterations in token calculation"
+    },
+    {
+      "code": 12405,
+      "name": "InsufficientLiquidity",
+      "msg": "Insufficient liquidity in virtual AMM"
+    },
+    {
+      "code": 12406,
+      "name": "InsufficientTokensToSell",
+      "msg": "Insufficient tokens to sell"
+    }
+  ],
+  "types": [
+    {
+      "name": "AllocationSummary",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "kol_personal_allocation",
+            "type": "u64"
+          },
+          {
+            "name": "kol_personal_claimed",
+            "type": "u64"
+          },
+          {
+            "name": "kol_personal_remaining",
+            "type": "u64"
+          },
+          {
+            "name": "kol_global_allocation",
+            "type": "u64"
+          },
+          {
+            "name": "kol_global_sold",
+            "type": "u64"
+          },
+          {
+            "name": "kol_global_remaining",
+            "type": "u64"
+          },
+          {
+            "name": "public_global_allocation",
+            "type": "u64"
+          },
+          {
+            "name": "public_global_sold",
+            "type": "u64"
+          },
+          {
+            "name": "public_global_remaining",
+            "type": "u64"
+          },
+          {
+            "name": "public_user_sol_spent",
+            "type": "u64"
+          },
+          {
+            "name": "public_user_sol_remaining",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FactoryConfig",
+      "docs": [
+        "Factory configuration account - global settings for all token sales"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "platform_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "backend_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "kol_phase_duration",
+            "type": "u64"
+          },
+          {
+            "name": "migration_threshold",
+            "type": "u64"
+          },
+          {
+            "name": "total_tokens_created",
+            "type": "u64"
+          },
+          {
+            "name": "strict_price_mode",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "KolData",
+      "docs": [
+        "KOL (Key Opinion Leader) allocation data"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "kol_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "allocation",
+            "type": "u64"
+          },
+          {
+            "name": "claimed",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "KolMasterData",
+      "docs": [
+        "Master KOL allocation data (per KOL, global across all mints)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "kol_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "allocation",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "twitter_id",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "KolPhaseStarted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "duration_seconds",
+            "docs": [
+              "Phase duration in seconds"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "end_timestamp",
+            "docs": [
+              "End timestamp"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "kol_allocation",
+            "docs": [
+              "KOL allocation for this phase"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "registered_kol_count",
+            "docs": [
+              "Number of registered KOLs"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Start timestamp"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LimitType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "KolPerTransaction"
+          },
+          {
+            "name": "KolTotalAllocation"
+          },
+          {
+            "name": "PublicPerTransaction"
+          },
+          {
+            "name": "PublicTotalAllocation"
+          },
+          {
+            "name": "MigrationCap"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MasterKolAllocationUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "kol_wallet",
+            "docs": [
+              "KOL wallet address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "old_allocation",
+            "docs": [
+              "Previous master allocation"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "new_allocation",
+            "docs": [
+              "New master allocation"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Update timestamp"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MigrationThresholdUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "docs": [
+              "Authority making the change"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "old_threshold",
+            "docs": [
+              "Old threshold (micro-USD)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "new_threshold",
+            "docs": [
+              "New threshold (micro-USD)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Update timestamp"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MigrationTriggered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "total_usd_raised",
+            "docs": [
+              "Total USD raised (micro-USD)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_market_cap",
+            "docs": [
+              "Total market cap at migration (micro-USD)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "threshold",
+            "docs": [
+              "Migration threshold (micro-USD)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Trigger timestamp"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Phase",
+      "docs": [
+        "Enum to represent the different phases of the token sale"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "KOL"
+          },
+          {
+            "name": "Public"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PhaseChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "old_phase",
+            "docs": [
+              "Previous phase"
+            ],
+            "type": {
+              "defined": {
+                "name": "Phase"
+              }
+            }
+          },
+          {
+            "name": "new_phase",
+            "docs": [
+              "New phase"
+            ],
+            "type": {
+              "defined": {
+                "name": "Phase"
+              }
+            }
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Change timestamp"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PhaseTransition",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "from_phase",
+            "docs": [
+              "Previous phase"
+            ],
+            "type": {
+              "defined": {
+                "name": "TradingPhase"
+              }
+            }
+          },
+          {
+            "name": "to_phase",
+            "docs": [
+              "New phase"
+            ],
+            "type": {
+              "defined": {
+                "name": "TradingPhase"
+              }
+            }
+          },
+          {
+            "name": "reason",
+            "docs": [
+              "Reason for transition"
+            ],
+            "type": {
+              "defined": {
+                "name": "TransitionReason"
+              }
+            }
+          },
+          {
+            "name": "total_tokens_sold",
+            "docs": [
+              "Total tokens sold at transition"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_usd_raised",
+            "docs": [
+              "Total USD raised at transition"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_market_cap",
+            "docs": [
+              "Total market cap at transition (micro-USD)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Transition timestamp"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlatformVault",
+      "docs": [
+        "Program-owned vault to accumulate platform fees, withdrawable by authority"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceCache",
+      "docs": [
+        "Cached SOL/USD price updated via a keeper using Pyth PriceUpdateV2"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "price_micro_usd",
+            "type": "u64"
+          },
+          {
+            "name": "last_updated",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceFeedMessage",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "feed_id",
+            "docs": [
+              "`FeedId` but avoid the type alias because of compatibility issues with Anchor's `idl-build` feature."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "price",
+            "type": "i64"
+          },
+          {
+            "name": "conf",
+            "type": "u64"
+          },
+          {
+            "name": "exponent",
+            "type": "i32"
+          },
+          {
+            "name": "publish_time",
+            "docs": [
+              "The timestamp of this price update in seconds"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "prev_publish_time",
+            "docs": [
+              "The timestamp of the previous price update. This field is intended to allow users to",
+              "identify the single unique price update for any moment in time:",
+              "for any time t, the unique update is the one such that prev_publish_time < t <= publish_time.",
+              "",
+              "Note that there may not be such an update while we are migrating to the new message-sending logic,",
+              "as some price updates on pythnet may not be sent to other chains (because the message-sending",
+              "logic may not have triggered). We can solve this problem by making the message-sending mandatory",
+              "(which we can do once publishers have migrated over).",
+              "",
+              "Additionally, this field may be equal to publish_time if the message is sent on a slot where",
+              "where the aggregation was unsuccesful. This problem will go away once all publishers have",
+              "migrated over to a recent version of pyth-agent."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "ema_price",
+            "type": "i64"
+          },
+          {
+            "name": "ema_conf",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceFeedWarning",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint address (if applicable)"
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "warning_type",
+            "docs": [
+              "Warning type"
+            ],
+            "type": {
+              "defined": {
+                "name": "PriceFeedWarningType"
+              }
+            }
+          },
+          {
+            "name": "price_feed_account",
+            "docs": [
+              "Price feed account that caused the issue"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "fallback_price_usd",
+            "docs": [
+              "Fallback price used (if any)"
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Warning timestamp"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceFeedWarningType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Stale"
+          },
+          {
+            "name": "Invalid"
+          },
+          {
+            "name": "Empty"
+          },
+          {
+            "name": "Unreasonable"
+          },
+          {
+            "name": "Fallback"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceModeUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "docs": [
+              "Factory authority"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "old_strict_mode",
+            "docs": [
+              "Old price mode"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "new_strict_mode",
+            "docs": [
+              "New price mode"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Update timestamp"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceUpdateV2",
+      "docs": [
+        "A price update account. This account is used by the Pyth Receiver program to store a verified price update from a Pyth price feed.",
+        "It contains:",
+        "- `write_authority`: The write authority for this account. This authority can close this account to reclaim rent or update the account to contain a different price update.",
+        "- `verification_level`: The [`VerificationLevel`] of this price update. This represents how many Wormhole guardian signatures have been verified for this price update.",
+        "- `price_message`: The actual price update.",
+        "- `posted_slot`: The slot at which this price update was posted."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "write_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "verification_level",
+            "type": {
+              "defined": {
+                "name": "VerificationLevel"
+              }
+            }
+          },
+          {
+            "name": "price_message",
+            "type": {
+              "defined": {
+                "name": "PriceFeedMessage"
+              }
+            }
+          },
+          {
+            "name": "posted_slot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PublicPhaseStarted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "public_allocation",
+            "docs": [
+              "Remaining tokens available for public"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "current_price_usd",
+            "docs": [
+              "Current token price (micro-USD)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Start timestamp"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PublicUserData",
+      "docs": [
+        "Public phase user purchase tracking data"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "user_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_sol_spent",
+            "type": "u64"
+          },
+          {
+            "name": "total_tokens_bought",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SaleConfig",
+      "docs": [
+        "Configuration for individual token sales with pump.fun bonding curve mechanics"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "backend_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "initial_price",
+            "type": "u64"
+          },
+          {
+            "name": "max_supply",
+            "type": "u64"
+          },
+          {
+            "name": "dev_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "platform_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "phase",
+            "type": {
+              "defined": {
+                "name": "Phase"
+              }
+            }
+          },
+          {
+            "name": "total_sold",
+            "type": "u64"
+          },
+          {
+            "name": "dev_sold",
+            "type": "u64"
+          },
+          {
+            "name": "kol_sold",
+            "type": "u64"
+          },
+          {
+            "name": "public_sold",
+            "type": "u64"
+          },
+          {
+            "name": "kol_phase_start_time",
+            "type": "i64"
+          },
+          {
+            "name": "kol_phase_duration",
+            "type": "u64"
+          },
+          {
+            "name": "kol_allocation",
+            "type": "u64"
+          },
+          {
+            "name": "public_allocation",
+            "type": "u64"
+          },
+          {
+            "name": "base_allocation",
+            "type": "u64"
+          },
+          {
+            "name": "score_multiplier",
+            "type": "u64"
+          },
+          {
+            "name": "migrated",
+            "type": "bool"
+          },
+          {
+            "name": "migration_threshold",
+            "type": "u64"
+          },
+          {
+            "name": "total_usd_raised",
+            "type": "u64"
+          },
+          {
+            "name": "total_market_cap",
+            "type": "u64"
+          },
+          {
+            "name": "virtual_sol_reserves",
+            "type": "u64"
+          },
+          {
+            "name": "virtual_token_reserves",
+            "type": "u64"
+          },
+          {
+            "name": "k",
+            "type": "u128"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "symbol",
+            "type": "string"
+          },
+          {
+            "name": "uri",
+            "type": "string"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "dev_wallet",
+            "docs": [
+              "Developer wallet that created the token"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "docs": [
+              "Token name"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "symbol",
+            "docs": [
+              "Token symbol"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "uri",
+            "docs": [
+              "Metadata URI"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "initial_dev_purchase",
+            "docs": [
+              "Initial dev purchase amount (SOL)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Creation timestamp"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenEstimation",
+      "docs": [
+        "Comprehensive token estimation result for SOL input"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokens_received",
+            "type": "u64"
+          },
+          {
+            "name": "sol_amount_input",
+            "type": "u64"
+          },
+          {
+            "name": "sol_price_usd",
+            "type": "u64"
+          },
+          {
+            "name": "current_token_price_usd",
+            "type": "u64"
+          },
+          {
+            "name": "avg_price_per_token_usd",
+            "type": "u64"
+          },
+          {
+            "name": "total_fees",
+            "type": "u64"
+          },
+          {
+            "name": "platform_fee",
+            "type": "u64"
+          },
+          {
+            "name": "deployer_fee",
+            "type": "u64"
+          },
+          {
+            "name": "net_sol_for_tokens",
+            "type": "u64"
+          },
+          {
+            "name": "is_new_token",
+            "type": "bool"
+          },
+          {
+            "name": "market_cap_usd",
+            "type": "u64"
+          },
+          {
+            "name": "tokens_sold_so_far",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenPurchased",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "buyer",
+            "docs": [
+              "Buyer wallet address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "sol_amount",
+            "docs": [
+              "SOL amount spent (including fees)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "tokens_received",
+            "docs": [
+              "Tokens received (with decimals)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "phase",
+            "docs": [
+              "Current phase during purchase"
+            ],
+            "type": {
+              "defined": {
+                "name": "TradingPhase"
+              }
+            }
+          },
+          {
+            "name": "sol_price_usd",
+            "docs": [
+              "SOL price used for calculation (micro-USD)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_tokens_sold",
+            "docs": [
+              "Total tokens sold so far"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_usd_raised",
+            "docs": [
+              "Total USD raised so far"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_market_cap",
+            "docs": [
+              "Total market cap (micro-USD)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Transaction timestamp"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenSold",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "seller",
+            "docs": [
+              "Seller wallet address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "tokens_sold",
+            "docs": [
+              "Tokens sold (with decimals)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "sol_received",
+            "docs": [
+              "SOL amount received (after fees)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "sol_price_usd",
+            "docs": [
+              "SOL price used for calculation (micro-USD)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_tokens_sold",
+            "docs": [
+              "Total tokens sold after this transaction"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_usd_raised",
+            "docs": [
+              "Total USD raised after this transaction"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_market_cap",
+            "docs": [
+              "Total market cap (micro-USD)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Transaction timestamp"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TradeExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "trader",
+            "docs": [
+              "Trader wallet address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "trade_type",
+            "docs": [
+              "Type of trade (Buy/Sell)"
+            ],
+            "type": {
+              "defined": {
+                "name": "TradeType"
+              }
+            }
+          },
+          {
+            "name": "sol_amount",
+            "docs": [
+              "SOL amount involved"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "token_amount",
+            "docs": [
+              "Token amount involved"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "price_per_token",
+            "docs": [
+              "Price per token at execution"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "price_per_token_usd",
+            "docs": [
+              "Price per token in USD (micro-USD)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_supply_sold",
+            "docs": [
+              "Total supply sold after trade"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Trade execution timestamp"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TradeType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Buy"
+          },
+          {
+            "name": "Sell"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TradingPhase",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "KOL"
+          },
+          {
+            "name": "Public"
+          },
+          {
+            "name": "Migrated"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TransactionLimitWarning",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "user",
+            "docs": [
+              "User wallet"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "attempted_amount",
+            "docs": [
+              "Attempted amount"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "max_allowed",
+            "docs": [
+              "Maximum allowed"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "limit_type",
+            "docs": [
+              "Limit type"
+            ],
+            "type": {
+              "defined": {
+                "name": "LimitType"
+              }
+            }
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Warning timestamp"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TransitionReason",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "TimeExpired"
+          },
+          {
+            "name": "AllocationExhausted"
+          },
+          {
+            "name": "MigrationTriggered"
+          },
+          {
+            "name": "AdminAction"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VerificationLevel",
+      "docs": [
+        "Pyth price updates are bridged to all blockchains via Wormhole.",
+        "Using the price updates on another chain requires verifying the signatures of the Wormhole guardians.",
+        "The usual process is to check the signatures for two thirds of the total number of guardians, but this can be cumbersome on Solana because of the transaction size limits,",
+        "so we also allow for partial verification.",
+        "",
+        "This enum represents how much a price update has been verified:",
+        "- If `Full`, we have verified the signatures for two thirds of the current guardians.",
+        "- If `Partial`, only `num_signatures` guardian signatures have been checked.",
+        "",
+        "# Warning",
+        "Using partially verified price updates is dangerous, as it lowers the threshold of guardians that need to collude to produce a malicious price update."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Partial",
+            "fields": [
+              {
+                "name": "num_signatures",
+                "type": "u8"
+              }
+            ]
+          },
+          {
+            "name": "Full"
+          }
+        ]
+      }
+    }
+  ]
+}

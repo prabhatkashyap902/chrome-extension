@@ -1,73 +1,189 @@
 import { useEffect, useState } from "react";
 
 export default function App() {
-  const [tweetUrl, setTweetUrl] = useState("");
-  const [wallet, setWallet] = useState("");
-  const [status, setStatus] = useState("");
-  const [signature, setSignature] = useState("");
-  const [err, setErr] = useState("");
-  const [myXUsername, setMyXUsername] = useState("");
+  const [data, setData] = useState({
+    status: "",
+    walletAddress: "",
+    txHash: "",
+    tokenName: "",
+    tokenSymbol: "",
+    tokenMint: "",
+    myUsername: "",
+    error: ""
+  });
 
   useEffect(() => {
-    const load = () => {
+    // Load data from storage
+    const loadData = () => {
       chrome.storage.local.get(
-        [
-          "lastTweetUrl",
-          "walletAddress",
-          "signResult",
-          "lastActionStatus",
-          "lastError",
-          "loggedInXUsername",
-        ],
-        (data) => {
-          if (data.lastTweetUrl) setTweetUrl(data.lastTweetUrl);
-          if (data.walletAddress) setWallet(data.walletAddress);
-          if (data.signResult) setSignature(data.signResult);
-          if (data.lastActionStatus) setStatus(data.lastActionStatus);
-          if (data.lastError) setErr(data.lastError);
-          if (data.loggedInXUsername) setMyXUsername(data.loggedInXUsername);
+        ["status", "walletAddress", "txHash", "tokenName", "tokenSymbol", "tokenMint", "myUsername", "error"],
+        (result) => {
+          setData({
+            status: result.status || "Waiting...",
+            walletAddress: result.walletAddress || "",
+            txHash: result.txHash || "",
+            tokenName: result.tokenName || "",
+            tokenSymbol: result.tokenSymbol || "",
+            tokenMint: result.tokenMint || "",
+            myUsername: result.myUsername || "",
+            error: result.error || ""
+          });
         }
       );
     };
 
-    load();
-    chrome.storage.onChanged.addListener(load);
-    return () => chrome.storage.onChanged.removeListener(load);
+    loadData();
+
+    // Listen for storage changes
+    const listener = (changes, area) => {
+      if (area === "local") {
+        loadData();
+      }
+    };
+
+    chrome.storage.onChanged.addListener(listener);
+
+    return () => {
+      chrome.storage.onChanged.removeListener(listener);
+    };
   }, []);
 
   return (
-    <div style={{ padding: 16, display: "grid", gap: 12 }}>
-      <h2>Tweet Token Creator</h2>
-      <div>
-        <b>Your X Username:</b>
-        <br />
-        {myXUsername ? "@" + myXUsername : "Not detected"}
+    <div style={{ 
+      width: "400px", 
+      minHeight: "500px", 
+      background: "#000", 
+      color: "#fff",
+      padding: "24px",
+      fontFamily: "system-ui, -apple-system, sans-serif"
+    }}>
+      {/* Header */}
+      <div style={{ marginBottom: "32px" }}>
+        <h1 style={{ fontSize: "24px", marginBottom: "8px" }}>Tweet Token Creator</h1>
+        {data.myUsername && (
+          <p style={{ color: "#888", fontSize: "14px" }}>@{data.myUsername}</p>
+        )}
       </div>
 
-      <div>
-        <b>Tweet:</b> <br /> {tweetUrl || "-"}
-      </div>
-      <div>
-        <b>Wallet:</b> <br /> {wallet || "Not connected"}
+      {/* Status */}
+      <div style={{ 
+        padding: "16px", 
+        background: "#111", 
+        borderRadius: "8px",
+        marginBottom: "24px",
+        border: "1px solid #222"
+      }}>
+        <div style={{ fontSize: "12px", color: "#888", marginBottom: "4px" }}>Status</div>
+        <div style={{ fontSize: "16px" }}>{data.status}</div>
       </div>
 
-      <div>
-        <b>Status:</b> <br /> {status || "Idle"}
-      </div>
-
-      {signature && (
-        <div>
-          <b>Signature:</b>
-          <textarea
-            readOnly
-            value={signature}
-            style={{ width: "100%", height: 80 }}
-          />
+      {/* Error */}
+      {data.error && (
+        <div style={{ 
+          padding: "16px", 
+          background: "#331111", 
+          borderRadius: "8px",
+          marginBottom: "24px",
+          border: "1px solid #661111",
+          color: "#ff6666"
+        }}>
+          <div style={{ fontSize: "12px", marginBottom: "4px" }}>Error</div>
+          <div style={{ fontSize: "14px" }}>{data.error}</div>
         </div>
       )}
 
-      {status === "error" && (
-        <div style={{ color: "red", whiteSpace: "pre-wrap" }}>Error: {err}</div>
+      {/* Success - Show token details */}
+      {data.status === "success" && data.txHash && (
+        <div>
+          {/* Token Info */}
+          <div style={{ 
+            padding: "16px", 
+            background: "#111", 
+            borderRadius: "8px",
+            marginBottom: "16px",
+            border: "1px solid #222"
+          }}>
+            <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}>Token Created</div>
+            <div style={{ fontSize: "20px", marginBottom: "4px" }}>{data.tokenName}</div>
+            <div style={{ fontSize: "16px", color: "#888" }}>${data.tokenSymbol}</div>
+          </div>
+
+          {/* Wallet Address */}
+          <div style={{ 
+            padding: "16px", 
+            background: "#111", 
+            borderRadius: "8px",
+            marginBottom: "16px",
+            border: "1px solid #222"
+          }}>
+            <div style={{ fontSize: "12px", color: "#888", marginBottom: "4px" }}>Wallet Address</div>
+            <div style={{ fontSize: "12px", wordBreak: "break-all", fontFamily: "monospace" }}>
+              {data.walletAddress}
+            </div>
+          </div>
+
+          {/* Transaction Hash */}
+          <div style={{ 
+            padding: "16px", 
+            background: "#111", 
+            borderRadius: "8px",
+            marginBottom: "16px",
+            border: "1px solid #222"
+          }}>
+            <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}>Transaction Hash</div>
+            <div style={{ fontSize: "12px", wordBreak: "break-all", fontFamily: "monospace", marginBottom: "8px" }}>
+              {data.txHash}
+            </div>
+            <a 
+              href={`https://explorer.solana.com/tx/${data.txHash}?cluster=devnet`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ 
+                color: "#1DA1F2", 
+                fontSize: "12px",
+                textDecoration: "none"
+              }}
+            >
+              View on Solana Explorer →
+            </a>
+          </div>
+
+          {/* Token Mint */}
+          {data.tokenMint && (
+            <div style={{ 
+              padding: "16px", 
+              background: "#111", 
+              borderRadius: "8px",
+              border: "1px solid #222"
+            }}>
+              <div style={{ fontSize: "12px", color: "#888", marginBottom: "4px" }}>Token Mint Address</div>
+              <div style={{ fontSize: "12px", wordBreak: "break-all", fontFamily: "monospace" }}>
+                {data.tokenMint}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Instructions */}
+      {!data.txHash && !data.error && (
+        <div style={{ 
+          padding: "16px", 
+          background: "#111", 
+          borderRadius: "8px",
+          border: "1px solid #222",
+          fontSize: "14px",
+          lineHeight: "1.6",
+          color: "#888"
+        }}>
+          <p style={{ marginBottom: "12px" }}>How to use:</p>
+          <ol style={{ paddingLeft: "20px", margin: 0 }}>
+            <li style={{ marginBottom: "8px" }}>Make sure Phantom is on <strong style={{ color: "#fff" }}>Devnet</strong></li>
+            <li style={{ marginBottom: "8px" }}>Go to your profile on X/Twitter</li>
+            <li style={{ marginBottom: "8px" }}>Click "Create a token" on your tweet</li>
+            <li>Approve the transaction in Phantom</li>
+          </ol>
+        </div>
       )}
     </div>
   );
