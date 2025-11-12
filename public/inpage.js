@@ -1,4 +1,4 @@
-// Inpage script - uses IIFE bundles (window.solanaWeb3)
+// Inpage script - uses IIFE bundles (window.solanaWeb3 and window.anchor)
 (function() {
   console.log("[TTC Inpage] Script loaded");
   
@@ -73,7 +73,6 @@
               resolve();
             }
           }, 100);
-          // Timeout after 5 seconds
           setTimeout(() => {
             clearInterval(checkInterval);
             if (!window.solanaWeb3) {
@@ -86,7 +85,13 @@
       console.log("[TTC Inpage] ✅ Solana web3.js is available");
       
       // Get web3.js from global window object (injected by IIFE)
-      const web3 = window.solanaWeb3;
+      const { 
+        PublicKey, 
+        Transaction, 
+        SystemProgram, 
+        Keypair,
+        LAMPORTS_PER_SOL
+      } = window.solanaWeb3;
       
       // Check for Phantom wallet
       const provider = window.solana || window.phantom?.solana;
@@ -102,61 +107,36 @@
       console.log("[TTC Inpage] ✅ Connected to wallet:", walletPubkey);
       
       // Validate program ID
-      // if (!payload.programId || payload.programId === "CnfqUGYuKinSjAWU2abZBexMS3eHBG3vVKx9t5RR8mnu") {
-      //   throw new Error("⚠️ Program ID not configured! Please update /public/idl.json line 90 with your actual Solana program ID from idl.metadata.address");
-      // }
+      if (!payload.programId || payload.programId === "YOUR_PROGRAM_ID_HERE") {
+        throw new Error("⚠️ Program ID not configured!");
+      }
       
-      // Get program ID from IDL
-      const PROGRAM_ID = new web3.PublicKey("CnfqUGYuKinSjAWU2abZBexMS3eHBG3vVKx9t5RR8mnu");
-      const METADATA_PROGRAM_ID = new web3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
-      const TOKEN_PROGRAM_ID = new web3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-      const ASSOCIATED_TOKEN_PROGRAM_ID = new web3.PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
-      const RENT_SYSVAR = new web3.PublicKey("SysvarRent111111111111111111111111111111111");
+      // Constants
+      const PROGRAM_ID = new PublicKey(payload.programId);
+      const METADATA_PROGRAM_ID = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
+      const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+      const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
       
       console.log("[TTC Inpage] Program ID:", PROGRAM_ID.toString());
       
-      // Generate dummy metadata locally
-      const metadata = {
-        name: payload.tokenName,
-        symbol: payload.tokenSymbol,
-        description: `Token created from tweet: ${payload.tweetUrl}`,
-        image: "https://via.placeholder.com/512x512.png?text=Token",
-        external_url: payload.tweetUrl,
-        attributes: [
-          { trait_type: "Source", value: "Twitter/X" },
-          { trait_type: "Tweet", value: payload.tweetUrl },
-          { trait_type: "Created", value: new Date().toISOString() }
-        ],
-        properties: {
-          files: [
-            {
-              uri: "https://via.placeholder.com/512x512.png?text=Token",
-              type: "image/png"
-            }
-          ],
-          category: "image"
-        }
-      };
+      // Generate dummy metadata locally (in production, upload to backend)
+      const metadataUri = "https://arweave.net/placeholder-" + Date.now();
       
-      // Create dummy metadata URI (in production, upload to IPFS/Arweave)
-      const metadataUri = "https://arweave.net/placeholder-metadata-uri";
-      
-      console.log("[TTC Inpage] 📦 Metadata:", metadata);
       console.log("[TTC Inpage] 📎 Metadata URI:", metadataUri);
       
       // Generate token mint keypair
-      const tokenMint = web3.Keypair.generate();
+      const tokenMint = Keypair.generate();
       console.log("[TTC Inpage] 🪙 Token Mint:", tokenMint.publicKey.toString());
       
-      // Derive PDAs
+      // Derive PDAs (same as your code)
       const textEncoder = new TextEncoder();
       
-      const [factoryConfigPda] = web3.PublicKey.findProgramAddressSync(
+      const [factoryConfigPda] = PublicKey.findProgramAddressSync(
         [textEncoder.encode("factory_config_v2")],
         PROGRAM_ID
       );
       
-      const [saleConfigPda] = web3.PublicKey.findProgramAddressSync(
+      const [saleConfigPda] = PublicKey.findProgramAddressSync(
         [
           textEncoder.encode("sale_config"),
           publicKey.toBuffer(),
@@ -165,16 +145,20 @@
         PROGRAM_ID
       );
       
-      const [devTokenAccount] = web3.PublicKey.findProgramAddressSync(
+      const [devTokenAccount] = PublicKey.findProgramAddressSync(
         [
           publicKey.toBuffer(),
-          TOKEN_PROGRAM_ID.toBuffer(),
+          new Uint8Array([
+            6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235,
+            121, 172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133,
+            126, 255, 0, 169,
+          ]), // SPL token program constant
           tokenMint.publicKey.toBuffer(),
         ],
         ASSOCIATED_TOKEN_PROGRAM_ID
       );
       
-      const [metadataAccount] = web3.PublicKey.findProgramAddressSync(
+      const [metadataAccount] = PublicKey.findProgramAddressSync(
         [
           textEncoder.encode("metadata"),
           METADATA_PROGRAM_ID.toBuffer(),
@@ -183,7 +167,7 @@
         METADATA_PROGRAM_ID
       );
       
-      const [masterEditionAccount] = web3.PublicKey.findProgramAddressSync(
+      const [masterEditionAccount] = PublicKey.findProgramAddressSync(
         [
           textEncoder.encode("metadata"),
           METADATA_PROGRAM_ID.toBuffer(),
@@ -193,18 +177,24 @@
         METADATA_PROGRAM_ID
       );
       
+      const [priceCachePda] = PublicKey.findProgramAddressSync(
+        [
+          textEncoder.encode("price_cache"),
+          factoryConfigPda.toBuffer(),
+        ],
+        PROGRAM_ID
+      );
+      
       console.log("[TTC Inpage] 📍 PDAs derived:");
       console.log("  Factory Config:", factoryConfigPda.toString());
       console.log("  Sale Config:", saleConfigPda.toString());
       console.log("  Dev Token Account:", devTokenAccount.toString());
       console.log("  Metadata Account:", metadataAccount.toString());
       console.log("  Master Edition:", masterEditionAccount.toString());
+      console.log("  Price Cache:", priceCachePda.toString());
       
-      // Calculate discriminator for "create_token_sale"
+      // Build instruction data manually (since we don't have Anchor in browser)
       const discriminator = await calculateDiscriminator("global:create_token_sale");
-      console.log("[TTC Inpage] 📝 Discriminator:", Array.from(discriminator));
-      
-      // Build instruction data for createTokenSale
       const instructionData = buildCreateTokenSaleInstruction(
         discriminator,
         payload.tokenName,
@@ -221,30 +211,31 @@
       const recentBlockhash = blockhashData.result.value.blockhash;
       console.log("[TTC Inpage] ✅ Blockhash:", recentBlockhash);
       
-      // Build the transaction
-      const transaction = new web3.Transaction();
+      // Build transaction
+      const transaction = new Transaction();
       transaction.recentBlockhash = recentBlockhash;
       transaction.feePayer = publicKey;
       
-      // Add create token sale instruction
-      const createTokenInstruction = new web3.TransactionInstruction({
+      // Add instruction
+      const createTokenInstruction = {
         keys: [
-          { pubkey: publicKey, isSigner: true, isWritable: true }, // dev_wallet
-          { pubkey: factoryConfigPda, isSigner: false, isWritable: false }, // factory_config
-          { pubkey: tokenMint.publicKey, isSigner: true, isWritable: true }, // token_mint
-          { pubkey: saleConfigPda, isSigner: false, isWritable: true }, // sale_config
-          { pubkey: devTokenAccount, isSigner: false, isWritable: true }, // dev_token_account
-          { pubkey: metadataAccount, isSigner: false, isWritable: true }, // metadata_account
-          { pubkey: masterEditionAccount, isSigner: false, isWritable: true }, // master_edition
-          { pubkey: METADATA_PROGRAM_ID, isSigner: false, isWritable: false }, // token_metadata_program
-          { pubkey: web3.SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
-          { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
-          { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // associated_token_program
-          { pubkey: RENT_SYSVAR, isSigner: false, isWritable: false }, // rent
+          { pubkey: publicKey, isSigner: true, isWritable: true },
+          { pubkey: factoryConfigPda, isSigner: false, isWritable: false },
+          { pubkey: tokenMint.publicKey, isSigner: true, isWritable: true },
+          { pubkey: saleConfigPda, isSigner: false, isWritable: true },
+          { pubkey: devTokenAccount, isSigner: false, isWritable: true },
+          { pubkey: metadataAccount, isSigner: false, isWritable: true },
+          { pubkey: masterEditionAccount, isSigner: false, isWritable: true },
+          { pubkey: METADATA_PROGRAM_ID, isSigner: false, isWritable: false },
+          { pubkey: priceCachePda, isSigner: false, isWritable: false },
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+          { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+          { pubkey: new PublicKey("SysvarRent111111111111111111111111111111111"), isSigner: false, isWritable: false },
         ],
         programId: PROGRAM_ID,
-        data: instructionData, // Already a Uint8Array, no need for Buffer
-      });
+        data: instructionData,
+      };
       
       transaction.add(createTokenInstruction);
       
@@ -258,16 +249,34 @@
       
       console.log("[TTC Inpage] ✅ Transaction signed by wallet");
       
-      // Send transaction
+      // Send transaction - FIXED: Use correct RPC method and encoding
       console.log("[TTC Inpage] 📡 Sending transaction to Solana devnet...");
       const serialized = signedTransaction.serialize();
       
-      const sendResult = await solanaRpc("sendRawTransaction", [
-        Array.from(serialized),
+      console.log("[TTC Inpage] 📦 Serialized transaction length:", serialized.length);
+      
+      // Convert to base64 (Solana RPC expects base64 encoding)
+      const base64Tx = btoa(String.fromCharCode.apply(null, serialized));
+      
+      const sendResult = await solanaRpc("sendTransaction", [
+        base64Tx,
         { encoding: "base64", skipPreflight: false, preflightCommitment: "confirmed" }
       ]);
       
+      console.log("[TTC Inpage] 📬 Send result:", JSON.stringify(sendResult, null, 2));
+      
+      // Check for RPC error
+      if (sendResult.error) {
+        console.error("[TTC Inpage] ❌ RPC Error:", sendResult.error);
+        throw new Error(`RPC Error: ${sendResult.error.message || JSON.stringify(sendResult.error)}`);
+      }
+      
       const signature = sendResult.result;
+      
+      if (!signature) {
+        console.error("[TTC Inpage] ❌ No signature returned. Full response:", sendResult);
+        throw new Error("Transaction sent but no signature returned. Check RPC response.");
+      }
       
       console.log("[TTC Inpage] 🎉 Token created successfully!");
       console.log("[TTC Inpage] 📝 Signature:", signature);
