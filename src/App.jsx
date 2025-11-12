@@ -9,7 +9,8 @@ export default function App() {
     tokenSymbol: "",
     tokenMint: "",
     myUsername: "",
-    error: ""
+    error: "",
+    walletType: "" // phantom, backpack, or solflare
   });
   
   const [isConnecting, setIsConnecting] = useState(false);
@@ -18,17 +19,18 @@ export default function App() {
     // Load data from storage
     const loadData = () => {
       chrome.storage.local.get(
-        ["status", "walletAddress", "txHash", "tokenName", "tokenSymbol", "tokenMint", "myUsername", "error"],
+        ["status", "walletAddress", "txHash", "tokenName", "tokenSymbol", "tokenMint", "myUsername", "error", "walletType"],
         (result) => {
           setData({
-            status: result.status || "Waiting...",
+            status: result.status || "Ready",
             walletAddress: result.walletAddress || "",
             txHash: result.txHash || "",
             tokenName: result.tokenName || "",
             tokenSymbol: result.tokenSymbol || "",
             tokenMint: result.tokenMint || "",
             myUsername: result.myUsername || "",
-            error: result.error || ""
+            error: result.error || "",
+            walletType: result.walletType || ""
           });
         }
       );
@@ -50,34 +52,87 @@ export default function App() {
     };
   }, []);
   
-  const handleConnectWallet = async () => {
+  const handleConnectWallet = async (walletType) => {
     setIsConnecting(true);
     try {
-      // Inject a script to connect to Phantom
+      // Send message to content script to connect wallet
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: async () => {
-          const provider = window.solana || window.phantom?.solana;
-          if (!provider) {
-            throw new Error("Phantom wallet not found");
-          }
-          const { publicKey } = await provider.connect();
-          return publicKey.toString();
+      // Check if we're on x.com or twitter.com
+      if (!tab.url || (!tab.url.includes('x.com') && !tab.url.includes('twitter.com'))) {
+        chrome.storage.local.set({ 
+          error: "Please open X/Twitter first, then click the connect button."
+        });
+        setIsConnecting(false);
+        return;
+      }
+      
+      // Send message to content script
+      chrome.tabs.sendMessage(tab.id, { 
+        action: "CONNECT_WALLET", 
+        walletType: walletType 
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error("Message error:", chrome.runtime.lastError);
+          chrome.storage.local.set({ 
+            error: "Failed to connect. Please refresh the X/Twitter page and try again."
+          });
+          setIsConnecting(false);
+          return;
         }
-      }).then(results => {
-        if (results && results[0] && results[0].result) {
-          chrome.storage.local.set({ walletAddress: results[0].result });
+        
+        if (response && response.success) {
+          chrome.storage.local.set({ 
+            walletAddress: response.walletAddress,
+            walletType: walletType,
+            error: "",
+            status: "Wallet connected"
+          });
+        } else {
+          chrome.storage.local.set({ 
+            error: response?.error || `Failed to connect ${walletType}. Make sure it's installed.`
+          });
         }
+        setIsConnecting(false);
       });
+      
     } catch (error) {
       console.error("Failed to connect wallet:", error);
       chrome.storage.local.set({ 
-        error: "Failed to connect wallet. Make sure Phantom is installed."
+        error: `Failed to connect wallet. ${error.message}`
       });
-    } finally {
       setIsConnecting(false);
+    }
+  };
+  
+  const handleDisconnectWallet = async () => {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      
+      // Send message to content script to disconnect wallet
+      if (tab.url && (tab.url.includes('x.com') || tab.url.includes('twitter.com'))) {
+        chrome.tabs.sendMessage(tab.id, { 
+          action: "DISCONNECT_WALLET",
+          walletType: data.walletType
+        }, () => {
+          // Ignore errors - just clear local storage anyway
+        });
+      }
+      
+      // Clear wallet data from storage
+      chrome.storage.local.set({ 
+        walletAddress: "",
+        walletType: "",
+        status: "Wallet disconnected",
+        error: "",
+        txHash: "",
+        tokenName: "",
+        tokenSymbol: "",
+        tokenMint: ""
+      });
+      
+    } catch (error) {
+      console.error("Failed to disconnect wallet:", error);
     }
   };
 
@@ -107,10 +162,30 @@ export default function App() {
           marginBottom: "24px",
           border: "1px solid #222"
         }}>
-          <div style={{ fontSize: "12px", color: "#888", marginBottom: "4px" }}>Connected Wallet</div>
+          <div style={{ fontSize: "12px", color: "#888", marginBottom: "4px" }}>
+            Connected Wallet {data.walletType && `(${data.walletType.charAt(0).toUpperCase() + data.walletType.slice(1)})`}
+          </div>
           <div style={{ fontSize: "12px", wordBreak: "break-all", fontFamily: "monospace", color: "#0f0" }}>
             {data.walletAddress}
           </div>
+          
+          {/* Disconnect button */}
+          <button
+            onClick={handleDisconnectWallet}
+            style={{
+              background: "#FF4500",
+              color: "#fff",
+              border: "none",
+              borderRadius: "8px",
+              padding: "12px 20px",
+              fontSize: "14px",
+              fontWeight: "600",
+              cursor: "pointer",
+              marginTop: "16px"
+            }}
+          >
+            Disconnect Wallet
+          </button>
         </div>
       ) : (
         <div style={{ 
@@ -121,24 +196,64 @@ export default function App() {
           border: "1px solid #222",
           textAlign: "center"
         }}>
-          <div style={{ fontSize: "14px", color: "#888", marginBottom: "12px" }}>No wallet connected</div>
-          <button
-            onClick={handleConnectWallet}
-            disabled={isConnecting}
-            style={{
-              background: "#1DA1F2",
-              color: "#fff",
-              border: "none",
-              borderRadius: "8px",
-              padding: "10px 20px",
-              fontSize: "14px",
-              fontWeight: "600",
-              cursor: isConnecting ? "not-allowed" : "pointer",
-              opacity: isConnecting ? 0.6 : 1
-            }}
-          >
-            {isConnecting ? "Connecting..." : "Connect Phantom Wallet"}
-          </button>
+          <div style={{ fontSize: "14px", color: "#888", marginBottom: "16px" }}>Connect your Solana wallet</div>
+          
+          {/* Wallet buttons */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <button
+              onClick={() => handleConnectWallet("phantom")}
+              disabled={isConnecting}
+              style={{
+                background: "#AB9FF2",
+                color: "#fff",
+                border: "none",
+                borderRadius: "8px",
+                padding: "12px 20px",
+                fontSize: "14px",
+                fontWeight: "600",
+                cursor: isConnecting ? "not-allowed" : "pointer",
+                opacity: isConnecting ? 0.6 : 1
+              }}
+            >
+              {isConnecting ? "Connecting..." : "Connect Phantom"}
+            </button>
+            
+            <button
+              onClick={() => handleConnectWallet("backpack")}
+              disabled={isConnecting}
+              style={{
+                background: "#E84142",
+                color: "#fff",
+                border: "none",
+                borderRadius: "8px",
+                padding: "12px 20px",
+                fontSize: "14px",
+                fontWeight: "600",
+                cursor: isConnecting ? "not-allowed" : "pointer",
+                opacity: isConnecting ? 0.6 : 1
+              }}
+            >
+              {isConnecting ? "Connecting..." : "Connect Backpack"}
+            </button>
+            
+            <button
+              onClick={() => handleConnectWallet("solflare")}
+              disabled={isConnecting}
+              style={{
+                background: "#FC6E20",
+                color: "#fff",
+                border: "none",
+                borderRadius: "8px",
+                padding: "12px 20px",
+                fontSize: "14px",
+                fontWeight: "600",
+                cursor: isConnecting ? "not-allowed" : "pointer",
+                opacity: isConnecting ? 0.6 : 1
+              }}
+            >
+              {isConnecting ? "Connecting..." : "Connect Solflare"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -229,7 +344,7 @@ export default function App() {
       )}
 
       {/* Instructions */}
-      {!data.txHash && !data.error && (
+      {!data.txHash && !data.error && data.walletAddress && (
         <div style={{ 
           padding: "16px", 
           background: "#111", 
@@ -241,11 +356,10 @@ export default function App() {
         }}>
           <p style={{ marginBottom: "12px" }}>How to use:</p>
           <ol style={{ paddingLeft: "20px", margin: 0 }}>
-            <li style={{ marginBottom: "8px" }}>Make sure Phantom is on <strong style={{ color: "#fff" }}>Devnet</strong></li>
-            <li style={{ marginBottom: "8px" }}>Connect your wallet above</li>
+            <li style={{ marginBottom: "8px" }}>Make sure wallet is on <strong style={{ color: "#fff" }}>Devnet</strong></li>
             <li style={{ marginBottom: "8px" }}>Go to your profile on X/Twitter</li>
             <li style={{ marginBottom: "8px" }}>Click "Create a token" on your tweet</li>
-            <li>Approve the transaction in Phantom</li>
+            <li>Approve the transaction in your wallet</li>
           </ol>
         </div>
       )}

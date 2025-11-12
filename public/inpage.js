@@ -51,11 +51,103 @@
       return;
     }
     
+    // Handle CONNECT_WALLET request
+    if (event.data.source === "TTC_CONTENT" && event.data.type === "CONNECT_WALLET") {
+      await connectWallet(event.data.walletType);
+      return;
+    }
+    
+    // Handle DISCONNECT_WALLET request
+    if (event.data.source === "TTC_CONTENT" && event.data.type === "DISCONNECT_WALLET") {
+      await disconnectWallet(event.data.walletType);
+      return;
+    }
+    
     // Handle CREATE_TOKEN request
     if (event.data.source === "TTC_CONTENT" && event.data.type === "CREATE_TOKEN") {
       await createToken(event.data.payload);
     }
   });
+  
+  async function connectWallet(walletType) {
+    try {
+      console.log(`[TTC Inpage] 🔌 Connecting to ${walletType}...`);
+      
+      let provider = null;
+      
+      if (walletType === "phantom") {
+        provider = window.phantom?.solana || window.solana;
+      } else if (walletType === "backpack") {
+        provider = window.backpack;
+      } else if (walletType === "solflare") {
+        provider = window.solflare;
+      }
+      
+      if (!provider) {
+        throw new Error(`${walletType.charAt(0).toUpperCase() + walletType.slice(1)} wallet not found. Please install it.`);
+      }
+      
+      // Connect to wallet
+      const result = await provider.connect();
+      const walletAddress = result.publicKey.toString();
+      
+      console.log(`[TTC Inpage] ✅ ${walletType} connected:`, walletAddress);
+      
+      // Send success message
+      window.postMessage({
+        source: "TTC_INPAGE",
+        type: "WALLET_CONNECTED",
+        walletAddress: walletAddress
+      }, "*");
+      
+    } catch (error) {
+      console.error("[TTC Inpage] ❌ Wallet connection error:", error);
+      window.postMessage({
+        source: "TTC_INPAGE",
+        type: "WALLET_ERROR",
+        error: error.message || "Failed to connect wallet"
+      }, "*");
+    }
+  }
+  
+  async function disconnectWallet(walletType) {
+    try {
+      console.log(`[TTC Inpage] 🔌 Disconnecting from ${walletType}...`);
+      
+      let provider = null;
+      
+      if (walletType === "phantom") {
+        provider = window.phantom?.solana || window.solana;
+      } else if (walletType === "backpack") {
+        provider = window.backpack;
+      } else if (walletType === "solflare") {
+        provider = window.solflare;
+      }
+      
+      if (!provider) {
+        throw new Error(`${walletType.charAt(0).toUpperCase() + walletType.slice(1)} wallet not found. Please install it.`);
+      }
+      
+      // Disconnect from wallet
+      await provider.disconnect();
+      
+      console.log(`[TTC Inpage] ✅ ${walletType} disconnected`);
+      
+      // Send success message
+      window.postMessage({
+        source: "TTC_INPAGE",
+        type: "WALLET_DISCONNECTED"
+      }, "*");
+      
+    } catch (error) {
+      console.error("[TTC Inpage] ❌ Wallet disconnection error:", error);
+      window.postMessage({
+        source: "TTC_INPAGE",
+        type: "WALLET_ERROR",
+        error: error.message || "Failed to disconnect wallet"
+      }, "*");
+    }
+  }
   
   async function createToken(payload) {
     try {
@@ -93,16 +185,51 @@
         LAMPORTS_PER_SOL
       } = window.solanaWeb3;
       
-      // Check for Phantom wallet
-      const provider = window.solana || window.phantom?.solana;
-      if (!provider) {
-        throw new Error("Phantom wallet not found. Please install Phantom.");
+      // Check for wallet - try to detect which one is connected
+      let provider = null;
+      let walletName = "";
+      
+      if (window.phantom?.solana?.isConnected) {
+        provider = window.phantom.solana;
+        walletName = "Phantom";
+      } else if (window.solana?.isPhantom && window.solana?.isConnected) {
+        provider = window.solana;
+        walletName = "Phantom";
+      } else if (window.backpack?.isConnected) {
+        provider = window.backpack;
+        walletName = "Backpack";
+      } else if (window.solflare?.isConnected) {
+        provider = window.solflare;
+        walletName = "Solflare";
+      } else if (window.phantom?.solana) {
+        provider = window.phantom.solana;
+        walletName = "Phantom";
+      } else if (window.solana) {
+        provider = window.solana;
+        walletName = "Phantom";
+      } else if (window.backpack) {
+        provider = window.backpack;
+        walletName = "Backpack";
+      } else if (window.solflare) {
+        provider = window.solflare;
+        walletName = "Solflare";
       }
       
-      console.log("[TTC Inpage] Phantom found, connecting...");
+      if (!provider) {
+        throw new Error("No Solana wallet found. Please install Phantom, Backpack, or Solflare.");
+      }
       
-      // Connect to Phantom
-      const { publicKey } = await provider.connect();
+      console.log(`[TTC Inpage] ${walletName} wallet found, connecting...`);
+      
+      // Connect to wallet
+      let publicKey;
+      if (!provider.isConnected) {
+        const result = await provider.connect();
+        publicKey = result.publicKey;
+      } else {
+        publicKey = provider.publicKey;
+      }
+      
       const walletPubkey = publicKey.toString();
       console.log("[TTC Inpage] ✅ Connected to wallet:", walletPubkey);
       
@@ -243,8 +370,8 @@
       transaction.partialSign(tokenMint);
       console.log("[TTC Inpage] 🔐 Transaction partially signed with tokenMint");
       
-      // Sign with Phantom wallet
-      console.log("[TTC Inpage] 📤 Requesting signature from Phantom...");
+      // Sign with wallet
+      console.log("[TTC Inpage] 📤 Requesting signature from wallet...");
       const signedTransaction = await provider.signTransaction(transaction);
       
       console.log("[TTC Inpage] ✅ Transaction signed by wallet");
