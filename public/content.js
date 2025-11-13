@@ -154,8 +154,10 @@ function addTokenButton(tweetElement) {
           
           // ⚠️ REPLACE THIS WITH YOUR ACTUAL PROGRAM ID FROM YOUR SMART CONTRACT
           const PROGRAM_ID = "CnfqUGYuKinSjAWU2abZBexMS3eHBG3vVKx9t5RR8mnu";
+          const API_URL = "https://dev.api.icm.social/api/tokens/upload-metadata-v2/";
           
           console.log("[TTC Content] Program ID:", PROGRAM_ID);
+          console.log("[TTC Content] API URL:", API_URL);
           
           // Inject inpage script
           injectInpage();
@@ -175,7 +177,8 @@ function addTokenButton(tweetElement) {
               tokenSymbol,
               tokenDescription,
               idl,
-              programId: PROGRAM_ID
+              programId: PROGRAM_ID,
+              apiUrl: API_URL
             }
           }, "*");
           
@@ -222,19 +225,15 @@ window.addEventListener("message", (event) => {
   if (event.source !== window) return;
   if (!event.data || !event.data.source) return;
   
-  // Proxy RPC requests from inpage to background
+  // Handle RPC requests from inpage
   if (event.data.source === "TTC_INPAGE" && event.data.type === "RPC_REQUEST") {
-    chrome.runtime.sendMessage(
-      { action: "SOLANA_RPC", payload: event.data.payload },
-      (response) => {
-        window.postMessage({
-          source: "TTC_CONTENT",
-          type: "RPC_RESPONSE",
-          requestId: event.data.requestId,
-          response
-        }, "*");
-      }
-    );
+    handleRpcRequest(event.data);
+    return;
+  }
+  
+  // Handle metadata upload requests from inpage
+  if (event.data.source === "TTC_INPAGE" && event.data.type === "METADATA_UPLOAD_REQUEST") {
+    handleMetadataUpload(event.data);
     return;
   }
   
@@ -331,3 +330,42 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 });
+
+// Helper function to handle RPC requests
+function handleRpcRequest(data) {
+  chrome.runtime.sendMessage(
+    { action: "SOLANA_RPC", payload: data.payload },
+    (response) => {
+      window.postMessage({
+        source: "TTC_CONTENT",
+        type: "RPC_RESPONSE",
+        requestId: data.requestId,
+        response
+      }, "*");
+    }
+  );
+}
+
+// Helper function to handle metadata upload requests
+function handleMetadataUpload(data) {
+  console.log("[TTC Content] 📤 Handling metadata upload...");
+  
+  // Forward to background script which has permission to make external requests
+  chrome.runtime.sendMessage(
+    { 
+      action: "UPLOAD_METADATA", 
+      apiUrl: data.apiUrl,
+      formData: data.formData
+    },
+    (response) => {
+      console.log("[TTC Content] 📬 Metadata upload response:", response);
+      window.postMessage({
+        source: "TTC_CONTENT",
+        type: "METADATA_UPLOAD_RESPONSE",
+        success: response.success,
+        metadata_url: response.metadata_url,
+        error: response.error
+      }, "*");
+    }
+  );
+}

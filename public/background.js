@@ -29,4 +29,51 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     
     return true; // Keep channel open for async response
   }
+  
+  // Upload metadata to backend API
+  if (message.action === "UPLOAD_METADATA") {
+    console.log("[TTC Background] 📤 Metadata upload request to:", message.apiUrl);
+    console.log("[TTC Background] 📋 FormData:", message.formData);
+    
+    // Create FormData from the plain object
+    const formData = new FormData();
+    Object.keys(message.formData).forEach(key => {
+      formData.append(key, message.formData[key]);
+    });
+    
+    console.log("[TTC Background] 🔄 Making fetch request...");
+    
+    fetch(message.apiUrl, {
+      method: "POST",
+      body: formData
+    })
+      .then(response => {
+        console.log("[TTC Background] 📡 Response status:", response.status);
+        console.log("[TTC Background] 📡 Response headers:", response.headers);
+        if (!response.ok) {
+          return response.text().then(text => {
+            console.error("[TTC Background] ❌ Response body:", text);
+            throw new Error(`HTTP ${response.status}: ${response.statusText} - ${text}`);
+          });
+        }
+        return response.json();
+      })
+      .then(data => {
+        console.log("[TTC Background] ✅ Metadata upload success:", data);
+        sendResponse({ 
+          success: true, 
+          metadata_url: data.metadata_url 
+        });
+      })
+      .catch(error => {
+        console.error("[TTC Background] ❌ Metadata upload error:", error);
+        console.error("[TTC Background] ❌ Error stack:", error.stack);
+        sendResponse({ 
+          success: false, 
+          error: error.message 
+        });
+      });
+    
+    return true; // Keep channel open for async response
+  }
 });

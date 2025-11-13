@@ -246,10 +246,97 @@
       
       console.log("[TTC Inpage] Program ID:", PROGRAM_ID.toString());
       
-      // Generate dummy metadata locally (in production, upload to backend)
-      const metadataUri = "https://arweave.net/placeholder-" + Date.now();
+      // Step 2: Upload metadata to backend API (MUST complete before proceeding)
+      console.log("[TTC Inpage] 📤 Uploading metadata to API...");
       
+      let metadataUri = null;
+      
+      const formData = new FormData();
+      formData.append("name", payload.tokenName.trim());
+      formData.append("symbol", payload.tokenSymbol.trim());
+      formData.append("description", payload.tokenDescription?.trim() || payload.tweetText.trim() || "Token created from tweet");
+      
+      // For now, we'll use a default image since we don't have file upload in the extension
+      // You can add file upload later if needed
+      // formData.append("image", tokenDetails.token_image_file);
+      
+      formData.append("xLink", payload.tweetUrl || "");
+      formData.append("website", "");
+      formData.append("telegram", "");
+      formData.append("yapps", "");
+      formData.append("tweetContent", payload.tweetText.trim());
+      formData.append("retweetLink", payload.tweetUrl || "");
+
+      console.log("[TTC Inpage] 📋 Metadata FormData prepared");
+
+      // Make API call through content script (to bypass CSP)
+      const apiUrl = "https://dev.api.icm.social/api/tokens/upload-metadata-v2/";
+      
+      console.log("[TTC Inpage] 📡 Uploading to:", apiUrl);
+      
+      // Send FormData to content script for upload
+      const uploadResult = await new Promise((resolve, reject) => {
+        const uploadListener = (event) => {
+          if (event.source !== window) return;
+          if (!event.data || event.data.source !== "TTC_CONTENT") return;
+          
+          if (event.data.type === "METADATA_UPLOAD_RESPONSE") {
+            window.removeEventListener("message", uploadListener);
+            resolve(event.data);
+          }
+        };
+        
+        window.addEventListener("message", uploadListener);
+        
+        // Convert FormData to plain object for postMessage
+        const formDataObject = {
+          name: payload.tokenName.trim(),
+          symbol: payload.tokenSymbol.trim(),
+          description: payload.tokenDescription?.trim() || payload.tweetText.trim() || "Token created from tweet",
+          xLink: payload.tweetUrl || "",
+          website: "",
+          telegram: "",
+          yapps: "",
+          tweetContent: payload.tweetText.trim(),
+          retweetLink: payload.tweetUrl || ""
+        };
+        
+        window.postMessage({
+          source: "TTC_INPAGE",
+          type: "METADATA_UPLOAD_REQUEST",
+          apiUrl: apiUrl,
+          formData: formDataObject
+        }, "*");
+        
+        setTimeout(() => {
+          window.removeEventListener("message", uploadListener);
+          reject(new Error("Metadata upload timeout"));
+        }, 30000);
+      });
+
+      if (!uploadResult.success) {
+        throw new Error(`❌ Metadata upload failed: ${uploadResult.error}. Check browser console for details.`);
+      }
+
+      metadataUri = uploadResult.metadata_url;
+      
+      if (!metadataUri) {
+        throw new Error("❌ API did not return a metadata_url. Please check your backend API response.");
+      }
+      
+      // Validate it's a proper URL (not a data URI)
+      if (!metadataUri.startsWith("http://") && !metadataUri.startsWith("https://")) {
+        throw new Error(`❌ Invalid metadata URI format: "${metadataUri}". Smart contract requires a valid HTTP/HTTPS URL (e.g., from Arweave or IPFS).`);
+      }
+      
+      console.log("[TTC Inpage] ✅ Metadata uploaded successfully!");
       console.log("[TTC Inpage] 📎 Metadata URI:", metadataUri);
+      console.log("[TTC Inpage] 📏 Metadata URI length:", metadataUri.length, "bytes");
+      
+      // Warn if URI is very long (might cause transaction size issues)
+      if (metadataUri.length > 200) {
+        console.warn("[TTC Inpage] ⚠️ Metadata URI is very long (" + metadataUri.length + " bytes). This might cause transaction size issues. Consider using a URL shortener service.");
+      }
       
       // Generate token mint keypair
       const tokenMint = Keypair.generate();
