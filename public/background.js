@@ -44,17 +44,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (key === 'image' && value && value.startsWith('data:')) {
         // Convert base64 to blob
         const base64Data = value.split(',')[1];
-        const mimeType = value.match(/:(.*?);/)[1];
-        const byteCharacters = atob(base64Data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: mimeType });
+        const mimeType = value.match(/data:(.*?);/)[1];
         
-        formData.append(key, blob, message.formData.imageFilename || 'image.jpg');
-      } else {
+        // Convert base64 to binary
+        const binaryString = atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        const blob = new Blob([bytes], { type: mimeType });
+        
+        console.log("[TTC Background] 📷 Image blob created:", blob.size, "bytes, type:", mimeType);
+        
+        formData.append(key, blob, message.formData.imageFilename || 'token_image.jpg');
+      } else if (key !== 'imageFilename') {
+        // Skip imageFilename as it's just metadata
         formData.append(key, value);
       }
     });

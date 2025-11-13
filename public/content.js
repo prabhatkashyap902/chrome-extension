@@ -156,90 +156,44 @@ function addTokenButton(tweetElement) {
     button.onclick = async () => {
       console.log("[TTC Content] 🔘 Create token button clicked");
       
-      // Check if wallet is connected first
-      chrome.storage.local.get(["walletAddress"], async (result) => {
-        if (!result.walletAddress) {
-          // Wallet not connected - open popup to show connect UI
-          console.log("[TTC Content] ⚠️ Wallet not connected, opening popup...");
-          chrome.storage.local.set({
-            status: "Please connect your wallet first",
-            error: "You need to connect a wallet before creating tokens"
-          });
-          chrome.runtime.sendMessage({ action: "OPEN_POPUP" });
-          return;
-        }
-        
-        // Wallet is connected, proceed with token creation
-        // Generate token name and symbol from tweet
-        const tokenName = tweetText.slice(0, 10) || "My Token";
-        const tokenSymbol = (tweetText.slice(0, 4).toUpperCase().replace(/[^A-Z]/g, '') || "TKN");
-        const tokenDescription = tweetText || "Token created from tweet";
-        
-        // Set status to creating
-        chrome.storage.local.set({
-          status: "Creating token...",
-          txHash: "",
-          tokenName: "",
-          tokenSymbol: "",
-          tokenMint: "",
-          error: ""
-        });
-        
+      // Get tweet text and URL
+      const tweetTextElem = tweetElement.querySelector('[data-testid="tweetText"]');
+      const tweetText = tweetTextElem ? tweetTextElem.textContent : "";
+      
+      const timeElem = tweetElement.querySelector("time");
+      const tweetUrl = timeElem && timeElem.parentElement ? timeElem.parentElement.href : "";
+      
+      // Extract tweet images
+      console.log("[TTC Content] 📷 Extracting tweet images...");
+      const tweetImages = await getTweetImages(tweetElement);
+      console.log(`[TTC Content] Found ${tweetImages.length} image(s) in tweet`);
+      
+      // Generate token name and symbol from tweet
+      const tokenName = tweetText.slice(0, 10) || "My Token";
+      const tokenSymbol = (tweetText.slice(0, 4).toUpperCase().replace(/[^A-Z]/g, '') || "TKN");
+      const tokenDescription = tweetText || "Token created from tweet";
+      
+      // Store tweet data for popup to use
+      chrome.storage.local.set({
+        tweetData: {
+          tweetText,
+          tweetUrl,
+          tokenName,
+          tokenSymbol,
+          tokenDescription,
+          tweetImages: tweetImages.map(img => ({
+            url: img.url,
+            base64: img.base64,
+            filename: img.filename,
+            type: img.type
+          }))
+        },
+        status: "Ready to create token",
+        error: ""
+      }, () => {
+        console.log("[TTC Content] ✅ Tweet data stored, opening popup...");
         // Open popup
         chrome.runtime.sendMessage({ action: "OPEN_POPUP" });
-        
-        try {
-          // Extract tweet images
-          console.log("[TTC Content] 📷 Extracting tweet images...");
-          const tweetImages = await getTweetImages(tweetElement);
-          console.log(`[TTC Content] Found ${tweetImages.length} image(s) in tweet`);
-          
-          // Load IDL
-          const idlUrl = chrome.runtime.getURL("idl.json");
-          const idlResponse = await fetch(idlUrl);
-          const idl = await idlResponse.json();
-          
-          // ⚠️ REPLACE THIS WITH YOUR ACTUAL PROGRAM ID FROM YOUR SMART CONTRACT
-          const PROGRAM_ID = "CnfqUGYuKinSjAWU2abZBexMS3eHBG3vVKx9t5RR8mnu";
-          const API_URL = "https://dev.api.icm.social/api/tokens/upload-metadata-v2/";
-          
-          console.log("[TTC Content] Program ID:", PROGRAM_ID);
-          console.log("[TTC Content] API URL:", API_URL);
-          
-          // Inject inpage script
-          injectInpage();
-          
-          // Wait for inpage to load
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // Send message to inpage to create token
-          console.log("[TTC Content] 📤 Sending create token request to inpage...");
-          window.postMessage({
-            source: "TTC_CONTENT",
-            type: "CREATE_TOKEN",
-            payload: {
-              tweetText,
-              tweetUrl,
-              tokenName,
-              tokenSymbol,
-              tokenDescription,
-              tweetImages: tweetImages.map(img => ({
-                url: img.url,
-                filename: img.filename
-              })),
-              idl,
-              programId: PROGRAM_ID,
-              apiUrl: API_URL
-            }
-          }, "*");
-          
-        } catch (error) {
-          console.error("[TTC Content] ❌ Error:", error);
-          chrome.storage.local.set({
-            status: "error",
-            error: error.message
-          });
-        }
       });
     };
   });
@@ -359,6 +313,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }, 500);
     
     // Return true to indicate async response
+    return true;
+  }
+  
+  if (request.action === "CREATE_TOKEN_FROM_POPUP") {
+    console.log("[TTC Content] 🚀 Create token from popup request");
+    
+    // Inject inpage if not already done
+    injectInpage();
+    
+    // Wait for inpage to load then send message
+    setTimeout(() => {
+      window.postMessage({
+        source: "TTC_CONTENT",
+        type: "CREATE_TOKEN",
+        payload: request.payload
+      }, "*");
+    }, 500);
+    
+    sendResponse({ success: true });
     return true;
   }
   

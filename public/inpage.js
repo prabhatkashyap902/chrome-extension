@@ -306,21 +306,33 @@
           const firstImage = payload.tweetImages[0];
           console.log("[TTC Inpage] 📷 Including tweet image in metadata:", firstImage.filename);
           
-          // Fetch the image and convert to base64
+          // Check if image is already base64 or needs to be fetched
           try {
-            const imgResponse = await fetch(firstImage.url);
-            const blob = await imgResponse.blob();
-            const base64 = await new Promise((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result);
-              reader.onerror = reject;
-              reader.readAsDataURL(blob);
-            });
+            let base64;
+            
+            if (firstImage.base64 && firstImage.base64.startsWith('data:')) {
+              // Image is already in base64 format (from form upload)
+              console.log("[TTC Inpage] 📷 Using pre-loaded base64 image");
+              base64 = firstImage.base64;
+            } else if (firstImage.url && (firstImage.url.startsWith('http://') || firstImage.url.startsWith('https://'))) {
+              // Image needs to be fetched from URL (from tweet)
+              console.log("[TTC Inpage] 📷 Fetching image from URL:", firstImage.url);
+              const imgResponse = await fetch(firstImage.url);
+              const blob = await imgResponse.blob();
+              base64 = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+              });
+            } else {
+              throw new Error("Invalid image format");
+            }
             
             formDataObject.image = base64;
             formDataObject.imageFilename = firstImage.filename;
           } catch (imgError) {
-            console.warn("[TTC Inpage] ⚠️ Failed to fetch tweet image:", imgError);
+            console.warn("[TTC Inpage] ⚠️ Failed to process tweet image:", imgError);
           }
         }
         
