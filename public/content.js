@@ -62,6 +62,48 @@ function getTweetAuthor(tweetElement) {
   return handleSpan.replace("@", "").trim();
 }
 
+// Get tweet images
+async function getTweetImages(tweetElement) {
+  const images = [];
+  
+  // Find all images in the tweet
+  const imgElements = tweetElement.querySelectorAll('img[src*="pbs.twimg.com/media"]');
+  
+  for (const img of imgElements) {
+    try {
+      // Get the image URL and convert to higher quality
+      let imgUrl = img.src;
+      
+      // Replace with original size image
+      imgUrl = imgUrl.replace(/&name=\w+/, '&name=large');
+      
+      console.log("[TTC Content] 📷 Found tweet image:", imgUrl);
+      
+      // Fetch the image and convert to blob
+      const response = await fetch(imgUrl);
+      const blob = await response.blob();
+      
+      // Convert blob to base64 for message passing
+      const base64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+      
+      images.push({
+        url: imgUrl,
+        base64: base64,
+        filename: `tweet_image_${Date.now()}_${images.length}.jpg`,
+        type: blob.type
+      });
+    } catch (error) {
+      console.error("[TTC Content] ❌ Error fetching image:", error);
+    }
+  }
+  
+  return images;
+}
+
 // Add "Create a token" button to user's own tweets
 function addTokenButton(tweetElement) {
   // Skip if already added
@@ -95,12 +137,12 @@ function addTokenButton(tweetElement) {
     button.style.cssText = `
       position: absolute;
       top: 8px;
-      right: 8px;
+      right: 4.5rem;
       padding: 6px 12px;
-      background: #1DA1F2;
+      background: #3c3c3cff;
       color: white;
       border: none;
-      border-radius: 16px;
+      border-radius: 4px;
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
@@ -147,6 +189,11 @@ function addTokenButton(tweetElement) {
         chrome.runtime.sendMessage({ action: "OPEN_POPUP" });
         
         try {
+          // Extract tweet images
+          console.log("[TTC Content] 📷 Extracting tweet images...");
+          const tweetImages = await getTweetImages(tweetElement);
+          console.log(`[TTC Content] Found ${tweetImages.length} image(s) in tweet`);
+          
           // Load IDL
           const idlUrl = chrome.runtime.getURL("idl.json");
           const idlResponse = await fetch(idlUrl);
@@ -176,6 +223,10 @@ function addTokenButton(tweetElement) {
               tokenName,
               tokenSymbol,
               tokenDescription,
+              tweetImages: tweetImages.map(img => ({
+                url: img.url,
+                filename: img.filename
+              })),
               idl,
               programId: PROGRAM_ID,
               apiUrl: API_URL
@@ -349,6 +400,8 @@ function handleRpcRequest(data) {
 // Helper function to handle metadata upload requests
 function handleMetadataUpload(data) {
   console.log("[TTC Content] 📤 Handling metadata upload...");
+  console.log("[TTC Content] 📋 API URL:", data.apiUrl);
+  console.log("[TTC Content] 📋 FormData:", data.formData);
   
   // Forward to background script which has permission to make external requests
   chrome.runtime.sendMessage(
@@ -358,6 +411,28 @@ function handleMetadataUpload(data) {
       formData: data.formData
     },
     (response) => {
+      if (chrome.runtime.lastError) {
+        console.error("[TTC Content] ❌ Chrome runtime error:", chrome.runtime.lastError);
+        window.postMessage({
+          source: "TTC_CONTENT",
+          type: "METADATA_UPLOAD_RESPONSE",
+          success: false,
+          error: chrome.runtime.lastError.message
+        }, "*");
+        return;
+      }
+      
+      if (!response) {
+        console.error("[TTC Content] ❌ No response from background script");
+        window.postMessage({
+          source: "TTC_CONTENT",
+          type: "METADATA_UPLOAD_RESPONSE",
+          success: false,
+          error: "No response from background script"
+        }, "*");
+        return;
+      }
+      
       console.log("[TTC Content] 📬 Metadata upload response:", response);
       window.postMessage({
         source: "TTC_CONTENT",

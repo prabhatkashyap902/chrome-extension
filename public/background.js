@@ -38,7 +38,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Create FormData from the plain object
     const formData = new FormData();
     Object.keys(message.formData).forEach(key => {
-      formData.append(key, message.formData[key]);
+      const value = message.formData[key];
+      
+      // Handle image files (base64 data)
+      if (key === 'image' && value && value.startsWith('data:')) {
+        // Convert base64 to blob
+        const base64Data = value.split(',')[1];
+        const mimeType = value.match(/:(.*?);/)[1];
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: mimeType });
+        
+        formData.append(key, blob, message.formData.imageFilename || 'image.jpg');
+      } else {
+        formData.append(key, value);
+      }
     });
     
     console.log("[TTC Background] 🔄 Making fetch request...");

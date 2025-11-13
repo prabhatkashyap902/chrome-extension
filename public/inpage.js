@@ -275,7 +275,7 @@
       console.log("[TTC Inpage] 📡 Uploading to:", apiUrl);
       
       // Send FormData to content script for upload
-      const uploadResult = await new Promise((resolve, reject) => {
+      const uploadResult = await new Promise(async (resolve, reject) => {
         const uploadListener = (event) => {
           if (event.source !== window) return;
           if (!event.data || event.data.source !== "TTC_CONTENT") return;
@@ -300,6 +300,29 @@
           tweetContent: payload.tweetText.trim(),
           retweetLink: payload.tweetUrl || ""
         };
+        
+        // Add first image if available
+        if (payload.tweetImages && payload.tweetImages.length > 0) {
+          const firstImage = payload.tweetImages[0];
+          console.log("[TTC Inpage] 📷 Including tweet image in metadata:", firstImage.filename);
+          
+          // Fetch the image and convert to base64
+          try {
+            const imgResponse = await fetch(firstImage.url);
+            const blob = await imgResponse.blob();
+            const base64 = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result);
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+            
+            formDataObject.image = base64;
+            formDataObject.imageFilename = firstImage.filename;
+          } catch (imgError) {
+            console.warn("[TTC Inpage] ⚠️ Failed to fetch tweet image:", imgError);
+          }
+        }
         
         window.postMessage({
           source: "TTC_INPAGE",
