@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
 import { CONFIG } from "../public/config.js";
+import ConnectWallet from "./components/ConnectWallet";
+import TokenCreationForm from "./components/TokenCreationForm";
+import SuccessDisplay from "./components/SuccessDisplay";
+import StatusDisplay from "./components/StatusDisplay";
+import Instructions from "./components/Instructions";
 
 export default function App() {
   const [data, setData] = useState({
@@ -16,6 +21,7 @@ export default function App() {
   const [tweetData, setTweetData] = useState(null);
   const [tokenName, setTokenName] = useState("");
   const [tokenSymbol, setTokenSymbol] = useState("");
+  const [solAmount, setSolAmount] = useState("0.1");
   const [imagePreview, setImagePreview] = useState("");
   const [uploadedImage, setUploadedImage] = useState("");
   const [uploadedImageFilename, setUploadedImageFilename] = useState("");
@@ -194,6 +200,7 @@ export default function App() {
       setTokenSymbol("");
       setImagePreview("");
       setUploadedImage("");
+      setSolAmount("0.1");
     } catch (error) {
       console.error("Failed to disconnect wallet:", error);
     }
@@ -271,6 +278,7 @@ export default function App() {
             idl,
             programId: PROGRAM_ID,
             apiUrl: API_URL,
+            solAmount: solAmount,
           },
         },
         (response) => {
@@ -295,6 +303,22 @@ export default function App() {
     }
   };
 
+  const handleCreateAnother = () => {
+    chrome.storage.local.set({
+      status: "Ready",
+      error: "",
+      txHash: "",
+      tokenMint: "",
+      tweetData: null,
+    });
+    setTweetData(null);
+    setTokenName("");
+    setTokenSymbol("");
+    setImagePreview("");
+    setUploadedImage("");
+    setSolAmount("0.1");
+  };
+
   return (
     <div
       style={{
@@ -317,512 +341,49 @@ export default function App() {
         )}
       </div>
 
-      {/* Wallet Info */}
-      {data.walletAddress ? (
-        <div
-          style={{
-            padding: "16px",
-            background: "#111",
-            borderRadius: "8px",
-            marginBottom: "24px",
-            border: "1px solid #222",
-          }}
-        >
-          <div style={{ fontSize: "12px", color: "#888", marginBottom: "4px" }}>
-            Connected Wallet{" "}
-            {data.walletType &&
-              `(${
-                data.walletType.charAt(0).toUpperCase() +
-                data.walletType.slice(1)
-              })`}
-          </div>
-          <div
-            style={{
-              fontSize: "12px",
-              wordBreak: "break-all",
-              fontFamily: "monospace",
-              color: "#0f0",
-            }}
-          >
-            {data.walletAddress}
-          </div>
-
-          <button
-            onClick={handleDisconnectWallet}
-            style={{
-              background: "#FF4500",
-              color: "#fff",
-              border: "none",
-              borderRadius: "8px",
-              padding: "12px 20px",
-              fontSize: "14px",
-              fontWeight: "600",
-              cursor: "pointer",
-              marginTop: "16px",
-            }}
-          >
-            Disconnect Wallet
-          </button>
-        </div>
-      ) : (
-        <div
-          style={{
-            padding: "16px",
-            background: "#111",
-            borderRadius: "8px",
-            marginBottom: "24px",
-            border: "1px solid #222",
-            textAlign: "center",
-          }}
-        >
-          <div
-            style={{ fontSize: "14px", color: "#888", marginBottom: "16px" }}
-          >
-            Connect your Solana wallet
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <button
-              onClick={() => handleConnectWallet("phantom")}
-              disabled={isConnecting}
-              style={{
-                background: "#AB9FF2",
-                color: "#fff",
-                border: "none",
-                borderRadius: "8px",
-                padding: "12px 20px",
-                fontSize: "14px",
-                fontWeight: "600",
-                cursor: isConnecting ? "not-allowed" : "pointer",
-                opacity: isConnecting ? 0.6 : 1,
-              }}
-            >
-              {isConnecting ? "Connecting..." : "Connect Phantom"}
-            </button>
-
-            <button
-              onClick={() => handleConnectWallet("backpack")}
-              disabled={isConnecting}
-              style={{
-                background: "#E84142",
-                color: "#fff",
-                border: "none",
-                borderRadius: "8px",
-                padding: "12px 20px",
-                fontSize: "14px",
-                fontWeight: "600",
-                cursor: isConnecting ? "not-allowed" : "pointer",
-                opacity: isConnecting ? 0.6 : 1,
-              }}
-            >
-              {isConnecting ? "Connecting..." : "Connect Backpack"}
-            </button>
-
-            <button
-              onClick={() => handleConnectWallet("solflare")}
-              disabled={isConnecting}
-              style={{
-                background: "#FC6E20",
-                color: "#fff",
-                border: "none",
-                borderRadius: "8px",
-                padding: "12px 20px",
-                fontSize: "14px",
-                fontWeight: "600",
-                cursor: isConnecting ? "not-allowed" : "pointer",
-                opacity: isConnecting ? 0.6 : 1,
-              }}
-            >
-              {isConnecting ? "Connecting..." : "Connect Solflare"}
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Connect Wallet Section */}
+      <ConnectWallet
+        walletAddress={data.walletAddress}
+        walletType={data.walletType}
+        isConnecting={isConnecting}
+        onConnect={handleConnectWallet}
+        onDisconnect={handleDisconnectWallet}
+      />
 
       {/* Token Creation Form - Only show if wallet connected and tweet data exists */}
       {data.walletAddress && tweetData && !data.txHash && (
-        <div>
-          {/* Image Upload */}
-          <div
-            style={{
-              padding: "10px",
-              background: "#111",
-              borderRadius: "6px",
-              marginBottom: "10px",
-              border: "1px solid #222",
-            }}
-          >
-            <label
-              style={{
-                fontSize: "11px",
-                color: "#888",
-                display: "block",
-                marginBottom: "6px",
-              }}
-            >
-              Token Image
-            </label>
-            {imagePreview && (
-              <div
-                style={{
-                  width: "100%",
-                  maxHeight: "200px",
-                  aspectRatio: "1",
-                  borderRadius: "6px",
-                  overflow: "hidden",
-                  background: "#222",
-                  marginBottom: "6px",
-                }}
-              >
-                <img
-                  src={imagePreview}
-                  alt="Token preview"
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              </div>
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              style={{
-                width: "100%",
-                padding: "6px",
-                background: "#222",
-                border: "1px solid #333",
-                borderRadius: "4px",
-                color: "#fff",
-                fontSize: "12px",
-              }}
-            />
-          </div>
-
-          {/* Token Name */}
-          <div
-            style={{
-              padding: "10px",
-              background: "#111",
-              borderRadius: "6px",
-              marginBottom: "10px",
-              border: "1px solid #222",
-            }}
-          >
-            <label
-              style={{
-                fontSize: "11px",
-                color: "#888",
-                display: "block",
-                marginBottom: "6px",
-              }}
-            >
-              Token Name
-            </label>
-            <input
-              type="text"
-              value={tokenName}
-              onChange={(e) => setTokenName(e.target.value)}
-              placeholder="Enter token name"
-              maxLength={32}
-              style={{
-                width: "100%",
-                padding: "8px",
-                background: "#222",
-                border: "1px solid #333",
-                borderRadius: "4px",
-                color: "#fff",
-                fontSize: "13px",
-              }}
-            />
-          </div>
-
-          {/* Token Symbol */}
-          <div
-            style={{
-              padding: "10px",
-              background: "#111",
-              borderRadius: "6px",
-              marginBottom: "10px",
-              border: "1px solid #222",
-            }}
-          >
-            <label
-              style={{
-                fontSize: "11px",
-                color: "#888",
-                display: "block",
-                marginBottom: "6px",
-              }}
-            >
-              Token Symbol
-            </label>
-            <input
-              type="text"
-              value={tokenSymbol}
-              onChange={(e) => setTokenSymbol(e.target.value.toUpperCase())}
-              placeholder="Enter token symbol"
-              maxLength={10}
-              style={{
-                width: "100%",
-                padding: "8px",
-                background: "#222",
-                border: "1px solid #333",
-                borderRadius: "4px",
-                color: "#fff",
-                fontSize: "13px",
-              }}
-            />
-          </div>
-
-          {/* Twitter Link (non-editable) */}
-          <div
-            style={{
-              padding: "10px",
-              background: "#111",
-              borderRadius: "6px",
-              marginBottom: "10px",
-              border: "1px solid #222",
-            }}
-          >
-            <label
-              style={{
-                fontSize: "11px",
-                color: "#888",
-                display: "block",
-                marginBottom: "6px",
-              }}
-            >
-              Twitter Link
-            </label>
-            <input
-              type="text"
-              value={tweetData?.tweetUrl || ""}
-              disabled
-              style={{
-                width: "100%",
-                padding: "8px",
-                background: "#222",
-                border: "1px solid #333",
-                borderRadius: "4px",
-                color: "#666",
-                fontSize: "12px",
-                cursor: "not-allowed",
-              }}
-            />
-          </div>
-
-          {/* Create Token Button */}
-          <button
-            onClick={handleCreateToken}
-            disabled={isCreating || !tokenName.trim() || !tokenSymbol.trim()}
-            style={{
-              width: "100%",
-              background:
-                isCreating || !tokenName.trim() || !tokenSymbol.trim()
-                  ? "#444"
-                  : "#AB9FF2",
-              color: "#fff",
-              border: "none",
-              borderRadius: "6px",
-              padding: "12px 16px",
-              fontSize: "14px",
-              fontWeight: "600",
-              cursor:
-                isCreating || !tokenName.trim() || !tokenSymbol.trim()
-                  ? "not-allowed"
-                  : "pointer",
-              marginBottom: "10px",
-            }}
-          >
-            {isCreating ? "Creating Token..." : "Create Token"}
-          </button>
-        </div>
+        <TokenCreationForm
+          tweetData={tweetData}
+          tokenName={tokenName}
+          tokenSymbol={tokenSymbol}
+          solAmount={solAmount}
+          imagePreview={imagePreview}
+          isCreating={isCreating}
+          onTokenNameChange={setTokenName}
+          onTokenSymbolChange={setTokenSymbol}
+          onSolAmountChange={setSolAmount}
+          onImageUpload={handleImageUpload}
+          onCreate={handleCreateToken}
+        />
       )}
 
-      {/* Status */}
-      {data.status && (
-        <div
-          style={{
-            padding: "16px",
-            background: "#111",
-            borderRadius: "8px",
-            marginBottom: "24px",
-            border: "1px solid #222",
-          }}
-        >
-          <div style={{ fontSize: "12px", color: "#888", marginBottom: "4px" }}>
-            Status
-          </div>
-          <div style={{ fontSize: "16px" }}>{data.status}</div>
-        </div>
-      )}
+      {/* Status and Error Display */}
+      <StatusDisplay status={data.status} error={data.error} />
 
-      {/* Error */}
-      {data.error && (
-        <div
-          style={{
-            padding: "16px",
-            background: "#331111",
-            borderRadius: "8px",
-            marginBottom: "24px",
-            border: "1px solid #661111",
-            color: "#ff6666",
-          }}
-        >
-          <div style={{ fontSize: "12px", marginBottom: "4px" }}>Error</div>
-          <div style={{ fontSize: "14px" }}>{data.error}</div>
-        </div>
-      )}
-
-      {/* Success - Show token details */}
+      {/* Success Display - Show token details */}
       {data.status === "success" && data.txHash && (
-        <div>
-          <div
-            style={{
-              padding: "16px",
-              background: "#111",
-              borderRadius: "8px",
-              marginBottom: "16px",
-              border: "1px solid #222",
-            }}
-          >
-            <div
-              style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}
-            >
-              Token Created
-            </div>
-            <div style={{ fontSize: "20px", marginBottom: "4px" }}>
-              {tokenName}
-            </div>
-            <div style={{ fontSize: "16px", color: "#888" }}>
-              ${tokenSymbol}
-            </div>
-          </div>
-
-          <div
-            style={{
-              padding: "16px",
-              background: "#111",
-              borderRadius: "8px",
-              marginBottom: "16px",
-              border: "1px solid #222",
-            }}
-          >
-            <div
-              style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}
-            >
-              Transaction Signature
-            </div>
-            <div
-              style={{
-                fontSize: "12px",
-                wordBreak: "break-all",
-                fontFamily: "monospace",
-                marginBottom: "8px",
-              }}
-            >
-              {data.txHash}
-            </div>
-            <a
-              href={`https://explorer.solana.com/tx/${data.txHash}?cluster=devnet`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                color: "#1DA1F2",
-                fontSize: "12px",
-                textDecoration: "none",
-              }}
-            >
-              View on Solana Explorer →
-            </a>
-          </div>
-
-          {data.tokenMint && (
-            <div
-              style={{
-                padding: "16px",
-                background: "#111",
-                borderRadius: "8px",
-                border: "1px solid #222",
-                marginBottom: "16px",
-              }}
-            >
-              <div
-                style={{ fontSize: "12px", color: "#888", marginBottom: "4px" }}
-              >
-                Token Mint Address
-              </div>
-              <div
-                style={{
-                  fontSize: "12px",
-                  wordBreak: "break-all",
-                  fontFamily: "monospace",
-                }}
-              >
-                {data.tokenMint}
-              </div>
-            </div>
-          )}
-
-          <button
-            onClick={() => {
-              chrome.storage.local.set({
-                status: "Ready",
-                error: "",
-                txHash: "",
-                tokenMint: "",
-                tweetData: null,
-              });
-              setTweetData(null);
-              setTokenName("");
-              setTokenSymbol("");
-              setImagePreview("");
-              setUploadedImage("");
-            }}
-            style={{
-              width: "100%",
-              background: "#AB9FF2",
-              color: "#fff",
-              border: "none",
-              borderRadius: "8px",
-              padding: "16px 20px",
-              fontSize: "16px",
-              fontWeight: "600",
-              cursor: "pointer",
-            }}
-          >
-            Create Another Token
-          </button>
-        </div>
+        <SuccessDisplay
+          tokenName={tokenName}
+          tokenSymbol={tokenSymbol}
+          txHash={data.txHash}
+          tokenMint={data.tokenMint}
+          onCreateAnother={handleCreateAnother}
+        />
       )}
 
       {/* Instructions */}
       {!data.txHash && !data.error && data.walletAddress && !tweetData && (
-        <div
-          style={{
-            padding: "16px",
-            background: "#111",
-            borderRadius: "8px",
-            border: "1px solid #222",
-            fontSize: "14px",
-            lineHeight: "1.6",
-            color: "#888",
-          }}
-        >
-          <p style={{ marginBottom: "12px" }}>How to use:</p>
-          <ol style={{ paddingLeft: "20px", margin: 0 }}>
-            <li style={{ marginBottom: "8px" }}>
-              Make sure wallet is on{" "}
-              <strong style={{ color: "#fff" }}>Devnet</strong>
-            </li>
-            <li style={{ marginBottom: "8px" }}>
-              Go to your profile on X/Twitter
-            </li>
-            <li style={{ marginBottom: "8px" }}>
-              Click "Create a token" on your tweet
-            </li>
-            <li>Fill in the form and create your token</li>
-          </ol>
-        </div>
+        <Instructions />
       )}
     </div>
   );

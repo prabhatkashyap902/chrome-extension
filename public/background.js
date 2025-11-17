@@ -33,12 +33,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Upload metadata to backend API
   if (message.action === "UPLOAD_METADATA") {
     console.log("[TTC Background] 📤 Metadata upload request to:", message.apiUrl);
-    console.log("[TTC Background] 📋 FormData:", message.formData);
+    console.log("[TTC Background] 📋 Upload Data:", message.uploadData);
     
     // Create FormData from the plain object
     const formData = new FormData();
-    Object.keys(message.formData).forEach(key => {
-      const value = message.formData[key];
+    Object.keys(message.uploadData).forEach(key => {
+      const value = message.uploadData[key];
       
       // Handle image files (base64 data)
       if (key === 'image' && value && value.startsWith('data:')) {
@@ -57,9 +57,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         
         console.log("[TTC Background] 📷 Image blob created:", blob.size, "bytes, type:", mimeType);
         
-        formData.append(key, blob, message.formData.imageFilename || 'token_image.jpg');
+        // Get filename from imageFilename field
+        const filename = message.uploadData.imageFilename || 'image.jpg';
+        formData.append('image', blob, filename);
       } else if (key !== 'imageFilename') {
-        // Skip imageFilename as it's just metadata
+        // Add other fields (skip imageFilename as it's used above)
         formData.append(key, value);
       }
     });

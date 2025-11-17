@@ -249,283 +249,45 @@
       // Step 2: Upload metadata to backend API (MUST complete before proceeding)
       console.log("[TTC Inpage] 📤 Uploading metadata to API...");
       
-      let metadataUri = null;
+      const metadataUri = await uploadTokenMetadata(
+        payload.apiUrl,
+        payload.tokenName, 
+        payload.tokenSymbol, 
+        payload.tokenDescription,
+        payload.tweetImages[0] || null,
+        payload.tweetUrl || null  // Add Twitter URL
+      );
+      console.log("[TTC Inpage] ✅ Metadata URI:", metadataUri);
       
-      const formData = new FormData();
-      formData.append("name", payload.tokenName.trim());
-      formData.append("symbol", payload.tokenSymbol.trim());
-      formData.append("description", payload.tokenDescription?.trim() || payload.tweetText.trim() || "Token created from tweet");
-      
-      // For now, we'll use a default image since we don't have file upload in the extension
-      // You can add file upload later if needed
-      // formData.append("image", tokenDetails.token_image_file);
-      
-      formData.append("xLink", payload.tweetUrl || "");
-      formData.append("website", "");
-      formData.append("telegram", "");
-      formData.append("yapps", "");
-      formData.append("tweetContent", payload.tweetText.trim());
-      formData.append("retweetLink", payload.tweetUrl || "");
-
-      console.log("[TTC Inpage] 📋 Metadata FormData prepared");
-
-      // Make API call through content script (to bypass CSP)
-      const apiUrl = "https://dev.api.icm.social/api/tokens/upload-metadata-v2/";
-      
-      console.log("[TTC Inpage] 📡 Uploading to:", apiUrl);
-      
-      // Send FormData to content script for upload
-      const uploadResult = await new Promise(async (resolve, reject) => {
-        const uploadListener = (event) => {
-          if (event.source !== window) return;
-          if (!event.data || event.data.source !== "TTC_CONTENT") return;
-          
-          if (event.data.type === "METADATA_UPLOAD_RESPONSE") {
-            window.removeEventListener("message", uploadListener);
-            resolve(event.data);
-          }
-        };
-        
-        window.addEventListener("message", uploadListener);
-        
-        // Convert FormData to plain object for postMessage
-        const formDataObject = {
-          name: payload.tokenName.trim(),
-          symbol: payload.tokenSymbol.trim(),
-          description: payload.tokenDescription?.trim() || payload.tweetText.trim() || "Token created from tweet",
-          xLink: payload.tweetUrl || "",
-          website: "",
-          telegram: "",
-          yapps: "",
-          tweetContent: payload.tweetText.trim(),
-          retweetLink: payload.tweetUrl || ""
-        };
-        
-        // Add first image if available
-        if (payload.tweetImages && payload.tweetImages.length > 0) {
-          const firstImage = payload.tweetImages[0];
-          console.log("[TTC Inpage] 📷 Including tweet image in metadata:", firstImage.filename);
-          
-          // Check if image is already base64 or needs to be fetched
-          try {
-            let base64;
-            
-            if (firstImage.base64 && firstImage.base64.startsWith('data:')) {
-              // Image is already in base64 format (from form upload)
-              console.log("[TTC Inpage] 📷 Using pre-loaded base64 image");
-              base64 = firstImage.base64;
-            } else if (firstImage.url && (firstImage.url.startsWith('http://') || firstImage.url.startsWith('https://'))) {
-              // Image needs to be fetched from URL (from tweet)
-              console.log("[TTC Inpage] 📷 Fetching image from URL:", firstImage.url);
-              const imgResponse = await fetch(firstImage.url);
-              const blob = await imgResponse.blob();
-              base64 = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-              });
-            } else {
-              throw new Error("Invalid image format");
-            }
-            
-            formDataObject.image = base64;
-            formDataObject.imageFilename = firstImage.filename;
-          } catch (imgError) {
-            console.warn("[TTC Inpage] ⚠️ Failed to process tweet image:", imgError);
-          }
+      // Get SOL amount from payload (handle empty string and zero)
+      let solAmount = 0.1; // default
+      if (payload.solAmount !== undefined && payload.solAmount !== null && payload.solAmount !== "") {
+        const parsed = parseFloat(payload.solAmount);
+        if (!isNaN(parsed) && parsed >= 0) {
+          solAmount = parsed;
         }
-        
-        window.postMessage({
-          source: "TTC_INPAGE",
-          type: "METADATA_UPLOAD_REQUEST",
-          apiUrl: apiUrl,
-          formData: formDataObject
-        }, "*");
-        
-        setTimeout(() => {
-          window.removeEventListener("message", uploadListener);
-          reject(new Error("Metadata upload timeout"));
-        }, 30000);
-      });
-
-      if (!uploadResult.success) {
-        throw new Error(`❌ Metadata upload failed: ${uploadResult.error}. Check browser console for details.`);
       }
-
-      metadataUri = uploadResult.metadata_url;
+      console.log("[TTC Inpage] 💰 Using SOL amount:", solAmount);
       
-      if (!metadataUri) {
-        throw new Error("❌ API did not return a metadata_url. Please check your backend API response.");
-      }
-      
-      // Validate it's a proper URL (not a data URI)
-      if (!metadataUri.startsWith("http://") && !metadataUri.startsWith("https://")) {
-        throw new Error(`❌ Invalid metadata URI format: "${metadataUri}". Smart contract requires a valid HTTP/HTTPS URL (e.g., from Arweave or IPFS).`);
-      }
-      
-      console.log("[TTC Inpage] ✅ Metadata uploaded successfully!");
-      console.log("[TTC Inpage] 📎 Metadata URI:", metadataUri);
-      console.log("[TTC Inpage] 📏 Metadata URI length:", metadataUri.length, "bytes");
-      
-      // Warn if URI is very long (might cause transaction size issues)
-      if (metadataUri.length > 200) {
-        console.warn("[TTC Inpage] ⚠️ Metadata URI is very long (" + metadataUri.length + " bytes). This might cause transaction size issues. Consider using a URL shortener service.");
-      }
-      
-      // Generate token mint keypair
-      const tokenMint = Keypair.generate();
-      console.log("[TTC Inpage] 🪙 Token Mint:", tokenMint.publicKey.toString());
-      
-      // Derive PDAs (same as your code)
-      const textEncoder = new TextEncoder();
-      
-      const [factoryConfigPda] = PublicKey.findProgramAddressSync(
-        [textEncoder.encode("factory_config_v2")],
-        PROGRAM_ID
-      );
-      
-      const [saleConfigPda] = PublicKey.findProgramAddressSync(
-        [
-          textEncoder.encode("sale_config"),
-          publicKey.toBuffer(),
-          tokenMint.publicKey.toBuffer(),
-        ],
-        PROGRAM_ID
-      );
-      
-      const [devTokenAccount] = PublicKey.findProgramAddressSync(
-        [
-          publicKey.toBuffer(),
-          new Uint8Array([
-            6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235,
-            121, 172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133,
-            126, 255, 0, 169,
-          ]), // SPL token program constant
-          tokenMint.publicKey.toBuffer(),
-        ],
-        ASSOCIATED_TOKEN_PROGRAM_ID
-      );
-      
-      const [metadataAccount] = PublicKey.findProgramAddressSync(
-        [
-          textEncoder.encode("metadata"),
-          METADATA_PROGRAM_ID.toBuffer(),
-          tokenMint.publicKey.toBuffer(),
-        ],
-        METADATA_PROGRAM_ID
-      );
-      
-      const [masterEditionAccount] = PublicKey.findProgramAddressSync(
-        [
-          textEncoder.encode("metadata"),
-          METADATA_PROGRAM_ID.toBuffer(),
-          tokenMint.publicKey.toBuffer(),
-          textEncoder.encode("edition"),
-        ],
-        METADATA_PROGRAM_ID
-      );
-      
-      const [priceCachePda] = PublicKey.findProgramAddressSync(
-        [
-          textEncoder.encode("price_cache"),
-          factoryConfigPda.toBuffer(),
-        ],
-        PROGRAM_ID
-      );
-      
-      console.log("[TTC Inpage] 📍 PDAs derived:");
-      console.log("  Factory Config:", factoryConfigPda.toString());
-      console.log("  Sale Config:", saleConfigPda.toString());
-      console.log("  Dev Token Account:", devTokenAccount.toString());
-      console.log("  Metadata Account:", metadataAccount.toString());
-      console.log("  Master Edition:", masterEditionAccount.toString());
-      console.log("  Price Cache:", priceCachePda.toString());
-      
-      // Build instruction data manually (since we don't have Anchor in browser)
-      const discriminator = await calculateDiscriminator("global:create_token_sale");
-      const instructionData = buildCreateTokenSaleInstruction(
-        discriminator,
+      // Create token via program
+      const { tokenMint, signature } = await createTokenViaProgramWithMetadata(
+        publicKey,
+        provider,
+        payload.programId,
         payload.tokenName,
         payload.tokenSymbol,
         metadataUri,
-        0.1 // 0.1 SOL initial buy
+        solAmount, // Use custom SOL amount from user input
+        PublicKey, // Pass web3 classes to the function
+        Transaction,
+        SystemProgram,
+        Keypair,
+        LAMPORTS_PER_SOL,
+        PROGRAM_ID,
+        METADATA_PROGRAM_ID,
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID
       );
-      
-      console.log("[TTC Inpage] 📝 Instruction data built");
-      
-      // Get latest blockhash
-      console.log("[TTC Inpage] Getting latest blockhash...");
-      const blockhashData = await solanaRpc("getLatestBlockhash", [{ commitment: "finalized" }]);
-      const recentBlockhash = blockhashData.result.value.blockhash;
-      console.log("[TTC Inpage] ✅ Blockhash:", recentBlockhash);
-      
-      // Build transaction
-      const transaction = new Transaction();
-      transaction.recentBlockhash = recentBlockhash;
-      transaction.feePayer = publicKey;
-      
-      // Add instruction
-      const createTokenInstruction = {
-        keys: [
-          { pubkey: publicKey, isSigner: true, isWritable: true },
-          { pubkey: factoryConfigPda, isSigner: false, isWritable: false },
-          { pubkey: tokenMint.publicKey, isSigner: true, isWritable: true },
-          { pubkey: saleConfigPda, isSigner: false, isWritable: true },
-          { pubkey: devTokenAccount, isSigner: false, isWritable: true },
-          { pubkey: metadataAccount, isSigner: false, isWritable: true },
-          { pubkey: masterEditionAccount, isSigner: false, isWritable: true },
-          { pubkey: METADATA_PROGRAM_ID, isSigner: false, isWritable: false },
-          { pubkey: priceCachePda, isSigner: false, isWritable: false },
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-          { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-          { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-          { pubkey: new PublicKey("SysvarRent111111111111111111111111111111111"), isSigner: false, isWritable: false },
-        ],
-        programId: PROGRAM_ID,
-        data: instructionData,
-      };
-      
-      transaction.add(createTokenInstruction);
-      
-      // Partial sign with tokenMint keypair
-      transaction.partialSign(tokenMint);
-      console.log("[TTC Inpage] 🔐 Transaction partially signed with tokenMint");
-      
-      // Sign with wallet
-      console.log("[TTC Inpage] 📤 Requesting signature from wallet...");
-      const signedTransaction = await provider.signTransaction(transaction);
-      
-      console.log("[TTC Inpage] ✅ Transaction signed by wallet");
-      
-      // Send transaction - FIXED: Use correct RPC method and encoding
-      console.log("[TTC Inpage] 📡 Sending transaction to Solana devnet...");
-      const serialized = signedTransaction.serialize();
-      
-      console.log("[TTC Inpage] 📦 Serialized transaction length:", serialized.length);
-      
-      // Convert to base64 (Solana RPC expects base64 encoding)
-      const base64Tx = btoa(String.fromCharCode.apply(null, serialized));
-      
-      const sendResult = await solanaRpc("sendTransaction", [
-        base64Tx,
-        { encoding: "base64", skipPreflight: false, preflightCommitment: "confirmed" }
-      ]);
-      
-      console.log("[TTC Inpage] 📬 Send result:", JSON.stringify(sendResult, null, 2));
-      
-      // Check for RPC error
-      if (sendResult.error) {
-        console.error("[TTC Inpage] ❌ RPC Error:", sendResult.error);
-        throw new Error(`RPC Error: ${sendResult.error.message || JSON.stringify(sendResult.error)}`);
-      }
-      
-      const signature = sendResult.result;
-      
-      if (!signature) {
-        console.error("[TTC Inpage] ❌ No signature returned. Full response:", sendResult);
-        throw new Error("Transaction sent but no signature returned. Check RPC response.");
-      }
       
       console.log("[TTC Inpage] 🎉 Token created successfully!");
       console.log("[TTC Inpage] 📝 Signature:", signature);
@@ -606,5 +368,270 @@
     }
     
     return result;
+  }
+  
+  // Function to upload token metadata
+  async function uploadTokenMetadata(apiUrl, name, symbol, description, image, tweetUrl) {
+    // Prepare data as plain object instead of FormData
+    const uploadData = {
+      name: name.trim(),
+      symbol: symbol.trim(),
+      description: description?.trim() || "Token created from tweet"
+    };
+    
+    // Add image if available
+    if (image) {
+      console.log("[TTC Inpage] 📷 Including tweet image in metadata:", image.filename);
+      
+      // Check if image is already base64 or needs to be fetched
+      try {
+        let base64;
+        
+        if (image.base64 && image.base64.startsWith('data:')) {
+          // Image is already in base64 format (from form upload)
+          console.log("[TTC Inpage] 📷 Using pre-loaded base64 image");
+          base64 = image.base64;
+        } else if (image.url && (image.url.startsWith('http://') || image.url.startsWith('https://'))) {
+          // Image needs to be fetched from URL (from tweet)
+          console.log("[TTC Inpage] 📷 Fetching image from URL:", image.url);
+          const imgResponse = await fetch(image.url);
+          const blob = await imgResponse.blob();
+          base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } else {
+          throw new Error("Invalid image format");
+        }
+        
+        uploadData.image = base64;
+        uploadData.imageFilename = image.filename;
+      } catch (imgError) {
+        console.warn("[TTC Inpage] ⚠️ Failed to process tweet image:", imgError);
+      }
+    }
+    
+    // Add tweet URL if available
+    if (tweetUrl) {
+      console.log("[TTC Inpage] 📚 Including tweet URL in metadata:", tweetUrl);
+      uploadData.tweetUrl = tweetUrl;
+    }
+    
+    // Make API call through content script (to bypass CSP)
+    console.log("[TTC Inpage] 📡 Uploading to:", apiUrl);
+    
+    // Send data to content script for upload
+    const uploadResult = await new Promise((resolve, reject) => {
+      const uploadListener = (event) => {
+        if (event.source !== window) return;
+        if (!event.data || event.data.source !== "TTC_CONTENT") return;
+        
+        if (event.data.type === "METADATA_UPLOAD_RESPONSE") {
+          window.removeEventListener("message", uploadListener);
+          resolve(event.data);
+        }
+      };
+      
+      window.addEventListener("message", uploadListener);
+      
+      window.postMessage({
+        source: "TTC_INPAGE",
+        type: "METADATA_UPLOAD_REQUEST",
+        apiUrl: apiUrl,
+        uploadData: uploadData
+      }, "*");
+      
+      setTimeout(() => {
+        window.removeEventListener("message", uploadListener);
+        reject(new Error("Metadata upload timeout"));
+      }, 30000);
+    });
+
+    if (!uploadResult.success) {
+      throw new Error(`❌ Metadata upload failed: ${uploadResult.error}. Check browser console for details.`);
+    }
+
+    const metadataUri = uploadResult.metadata_url;
+    
+    if (!metadataUri) {
+      throw new Error("❌ API did not return a metadata_url. Please check your backend API response.");
+    }
+    
+    // Validate it's a proper URL (not a data URI)
+    if (!metadataUri.startsWith("http://") && !metadataUri.startsWith("https://")) {
+      throw new Error(`❌ Invalid metadata URI format: "${metadataUri}". Smart contract requires a valid HTTP/HTTPS URL (e.g., from Arweave or IPFS).`);
+    }
+    
+    console.log("[TTC Inpage] ✅ Metadata uploaded successfully!");
+    console.log("[TTC Inpage] 📎 Metadata URI:", metadataUri);
+    console.log("[TTC Inpage] 📏 Metadata URI length:", metadataUri.length, "bytes");
+    
+    // Warn if URI is very long (might cause transaction size issues)
+    if (metadataUri.length > 200) {
+      console.warn("[TTC Inpage] ⚠️ Metadata URI is very long (" + metadataUri.length + " bytes). This might cause transaction size issues. Consider using a URL shortener service.");
+    }
+    
+    return metadataUri;
+  }
+  
+  // Function to create token via program with metadata
+  async function createTokenViaProgramWithMetadata(walletPublicKey, wallet, programId, tokenName, tokenSymbol, metadataUri, initialBuySOL, PublicKey, Transaction, SystemProgram, Keypair, LAMPORTS_PER_SOL, PROGRAM_ID, METADATA_PROGRAM_ID, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID) {
+    // Generate token mint keypair
+    const tokenMint = Keypair.generate();
+    console.log("[TTC Inpage] 🪙 Token Mint:", tokenMint.publicKey.toString());
+    
+    // Derive PDAs (same as your code)
+    const textEncoder = new TextEncoder();
+    
+    const [factoryConfigPda] = PublicKey.findProgramAddressSync(
+      [textEncoder.encode("factory_config_v2")],
+      PROGRAM_ID
+    );
+    
+    const [saleConfigPda] = PublicKey.findProgramAddressSync(
+      [
+        textEncoder.encode("sale_config"),
+        walletPublicKey.toBuffer(),
+        tokenMint.publicKey.toBuffer(),
+      ],
+      PROGRAM_ID
+    );
+    
+    const [devTokenAccount] = PublicKey.findProgramAddressSync(
+      [
+        walletPublicKey.toBuffer(),
+        new Uint8Array([
+          6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235,
+          121, 172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133,
+          126, 255, 0, 169,
+        ]), // SPL token program constant
+        tokenMint.publicKey.toBuffer(),
+      ],
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    
+    const [metadataAccount] = PublicKey.findProgramAddressSync(
+      [
+        textEncoder.encode("metadata"),
+        METADATA_PROGRAM_ID.toBuffer(),
+        tokenMint.publicKey.toBuffer(),
+      ],
+      METADATA_PROGRAM_ID
+    );
+    
+    const [masterEditionAccount] = PublicKey.findProgramAddressSync(
+      [
+        textEncoder.encode("metadata"),
+        METADATA_PROGRAM_ID.toBuffer(),
+        tokenMint.publicKey.toBuffer(),
+        textEncoder.encode("edition"),
+      ],
+      METADATA_PROGRAM_ID
+    );
+    
+    const [priceCachePda] = PublicKey.findProgramAddressSync(
+      [
+        textEncoder.encode("price_cache"),
+        factoryConfigPda.toBuffer(),
+      ],
+      PROGRAM_ID
+    );
+    
+    console.log("[TTC Inpage] 📍 PDAs derived:");
+    console.log("  Factory Config:", factoryConfigPda.toString());
+    console.log("  Sale Config:", saleConfigPda.toString());
+    console.log("  Dev Token Account:", devTokenAccount.toString());
+    console.log("  Metadata Account:", metadataAccount.toString());
+    console.log("  Master Edition:", masterEditionAccount.toString());
+    console.log("  Price Cache:", priceCachePda.toString());
+    
+    // Build instruction data manually (since we don't have Anchor in browser)
+    const discriminator = await calculateDiscriminator("global:create_token_sale");
+    const instructionData = buildCreateTokenSaleInstruction(
+      discriminator,
+      tokenName,
+      tokenSymbol,
+      metadataUri,
+      initialBuySOL // Use custom SOL amount from user input
+    );
+    
+    console.log("[TTC Inpage] 📝 Instruction data built");
+    
+    // Get latest blockhash
+    console.log("[TTC Inpage] Getting latest blockhash...");
+    const blockhashData = await solanaRpc("getLatestBlockhash", [{ commitment: "finalized" }]);
+    const recentBlockhash = blockhashData.result.value.blockhash;
+    console.log("[TTC Inpage] ✅ Blockhash:", recentBlockhash);
+    
+    // Build transaction
+    const transaction = new Transaction();
+    transaction.recentBlockhash = recentBlockhash;
+    transaction.feePayer = walletPublicKey;
+    
+    // Add instruction
+    const createTokenInstruction = {
+      keys: [
+        { pubkey: walletPublicKey, isSigner: true, isWritable: true },
+        { pubkey: factoryConfigPda, isSigner: false, isWritable: false },
+        { pubkey: tokenMint.publicKey, isSigner: true, isWritable: true },
+        { pubkey: saleConfigPda, isSigner: false, isWritable: true },
+        { pubkey: devTokenAccount, isSigner: false, isWritable: true },
+        { pubkey: metadataAccount, isSigner: false, isWritable: true },
+        { pubkey: masterEditionAccount, isSigner: false, isWritable: true },
+        { pubkey: METADATA_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: priceCachePda, isSigner: false, isWritable: false },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: new PublicKey("SysvarRent111111111111111111111111111111111"), isSigner: false, isWritable: false },
+      ],
+      programId: PROGRAM_ID,
+      data: instructionData,
+    };
+    
+    transaction.add(createTokenInstruction);
+    
+    // Partial sign with tokenMint keypair
+    transaction.partialSign(tokenMint);
+    console.log("[TTC Inpage] 🔐 Transaction partially signed with tokenMint");
+    
+    // Sign with wallet
+    console.log("[TTC Inpage] 📤 Requesting signature from wallet...");
+    const signedTransaction = await wallet.signTransaction(transaction);
+    
+    console.log("[TTC Inpage] ✅ Transaction signed by wallet");
+    
+    // Send transaction - FIXED: Use correct RPC method and encoding
+    console.log("[TTC Inpage] 📡 Sending transaction to Solana devnet...");
+    const serialized = signedTransaction.serialize();
+    
+    console.log("[TTC Inpage] 📦 Serialized transaction length:", serialized.length);
+    
+    // Convert to base64 (Solana RPC expects base64 encoding)
+    const base64Tx = btoa(String.fromCharCode.apply(null, serialized));
+    
+    const sendResult = await solanaRpc("sendTransaction", [
+      base64Tx,
+      { encoding: "base64", skipPreflight: false, preflightCommitment: "confirmed" }
+    ]);
+    
+    console.log("[TTC Inpage] 📬 Send result:", JSON.stringify(sendResult, null, 2));
+    
+    // Check for RPC error
+    if (sendResult.error) {
+      console.error("[TTC Inpage] ❌ RPC Error:", sendResult.error);
+      throw new Error(`RPC Error: ${sendResult.error.message || JSON.stringify(sendResult.error)}`);
+    }
+    
+    const signature = sendResult.result;
+    
+    if (!signature) {
+      console.error("[TTC Inpage] ❌ No signature returned. Full response:", sendResult);
+      throw new Error("Transaction sent but no signature returned. Check RPC response.");
+    }
+    
+    return { tokenMint, signature };
   }
 })();

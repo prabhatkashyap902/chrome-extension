@@ -5,19 +5,20 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>my-extension</title>
-    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-    <script src="https://unpkg.com/@coral-xyz/anchor@latest/dist/browser/index.js"></script>
-    <script src="https://unpkg.com/bs58@latest/index.js"></script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <style>
-  html, body {
-    width: 420px;
-    height: 650px;
-  }
-</style>
+    html, body, #root {
+      max-width: 420px;
+      max-height: 600px;
+      margin: 0;
+      padding: 0;
+      overflow: auto;
+      background-color: #000;
+    }
+    </style>
 
   </body>
 </html>
