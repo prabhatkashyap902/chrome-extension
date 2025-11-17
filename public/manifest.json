@@ -28,7 +28,7 @@
       "resources": [
         "inpage.js", 
         "idl.json",
-        "public/config.js",
+        "config.js",
         "libs/web3.iife.js",
         "libs/spl-token.iife.js"
       ],

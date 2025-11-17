@@ -391,21 +391,11 @@ window.addEventListener("message", (event) => {
     });
     safeChrome.runtime.sendMessage({ action: "OPEN_POPUP" });
     
-    // Re-process tweets after a short delay to update buttons
+    // Refresh the page after 3 seconds to show the new "Visit Token" button
+    console.log("[TTC Content] 🔄 Page will refresh in 3 seconds to update button...");
     setTimeout(() => {
-      const tweets = document.querySelectorAll('article[data-testid="tweet"]');
-      tweets.forEach(tweet => {
-        // Remove processed flag to force re-check
-        delete tweet.dataset.ttcProcessed;
-        // Remove existing button if any
-        const existingButton = tweet.querySelector('button');
-        if (existingButton && (existingButton.textContent === "Create a token" || existingButton.textContent === "Visit Token")) {
-          existingButton.remove();
-        }
-      });
-      // Re-add buttons with updated state
-      tweets.forEach(addTokenButton);
-    }, 2000);
+      window.location.reload();
+    }, 3000);
   }
   
   // Handle error
@@ -417,6 +407,9 @@ window.addEventListener("message", (event) => {
     });
     safeChrome.runtime.sendMessage({ action: "OPEN_POPUP" });
   }
+  
+  // Estimation feature removed - requires Anchor library
+  // Handle estimation response handler also removed
   
   // Handle wallet connection response from inpage
   if (event.data.source === "TTC_INPAGE" && event.data.type === "WALLET_CONNECTED") {
@@ -439,6 +432,30 @@ window.addEventListener("message", (event) => {
         error: event.data.error
       });
       delete window.__connectWalletCallback;
+    }
+  }
+  
+  // Handle estimation response from inpage
+  if (event.data.source === "TTC_INPAGE" && event.data.type === "TOKEN_ESTIMATION_RESPONSE") {
+    console.log("[TTC Content] 📊 Estimation response received:", event.data);
+    if (window.__estimateTokensCallback) {
+      window.__estimateTokensCallback({
+        success: true,
+        data: event.data
+      });
+      delete window.__estimateTokensCallback;
+    }
+  }
+  
+  // Handle estimation error from inpage
+  if (event.data.source === "TTC_INPAGE" && event.data.type === "ESTIMATE_TOKENS_ERROR") {
+    console.error("[TTC Content] ❌ Estimation failed:", event.data.error);
+    if (window.__estimateTokensCallback) {
+      window.__estimateTokensCallback({
+        success: false,
+        error: event.data.error
+      });
+      delete window.__estimateTokensCallback;
     }
   }
 });
@@ -487,7 +504,7 @@ safeChrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   
   if (request.action === "DISCONNECT_WALLET") {
-    console.log("[TTC Content] 🔌 Disconnect wallet request:", request.walletType);
+    console.log("[TTC Content] 🔌 Disconnect wallet request");
     
     // Inject inpage if not already done
     injectInpage();
@@ -502,6 +519,28 @@ safeChrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }, 500);
     
     sendResponse({ success: true });
+    return true;
+  }
+  
+  if (request.action === "ESTIMATE_TOKENS") {
+    console.log("[TTC Content] 📊 Estimate tokens request");
+    
+    // Inject inpage if not already done
+    injectInpage();
+    
+    // Store callback for async response
+    window.__estimateTokensCallback = sendResponse;
+    
+    // Wait for inpage to load then send message
+    setTimeout(() => {
+      window.postMessage({
+        source: "TTC_CONTENT",
+        type: "ESTIMATE_TOKENS",
+        payload: request.payload
+      }, "*");
+    }, 500);
+    
+    // Return true to indicate async response
     return true;
   }
 });

@@ -67,6 +67,11 @@
     if (event.data.source === "TTC_CONTENT" && event.data.type === "CREATE_TOKEN") {
       await createToken(event.data.payload);
     }
+    
+    // Handle ESTIMATE_TOKENS request
+    if (event.data.source === "TTC_CONTENT" && event.data.type === "ESTIMATE_TOKENS") {
+      await estimateTokensForSol(event.data.payload);
+    }
   });
   
   async function connectWallet(walletType) {
@@ -633,5 +638,180 @@
     }
     
     return { tokenMint, signature };
+  }
+  
+  // Function to estimate tokens for SOL
+  async function estimateTokensForSol(payload) {
+    try {
+      console.log("[TTC Inpage] 📊 Estimating tokens for SOL...");
+      console.log("[TTC Inpage] SOL Amount:", payload.solAmount);
+      
+      // Wait for web3 to be available
+      if (!window.solanaWeb3) {
+        console.log("[TTC Inpage] Waiting for Solana libraries to load...");
+        await new Promise((resolve) => {
+          const checkInterval = setInterval(() => {
+            if (window.solanaWeb3) {
+              clearInterval(checkInterval);
+              resolve();
+            }
+          }, 100);
+          setTimeout(() => {
+            clearInterval(checkInterval);
+            if (!window.solanaWeb3) {
+              throw new Error("Solana libraries failed to load");
+            }
+          }, 5000);
+        });
+      }
+      
+      console.log("[TTC Inpage] ✅ Solana libraries are available");
+      
+      // Get web3.js from global window object (injected by IIFE)
+      const { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } = window.solanaWeb3;
+      
+      // Check for wallet
+      let provider = null;
+      
+      if (window.phantom?.solana?.isConnected) {
+        provider = window.phantom.solana;
+      } else if (window.solana?.isPhantom && window.solana?.isConnected) {
+        provider = window.solana;
+      } else if (window.backpack?.isConnected) {
+        provider = window.backpack;
+      } else if (window.solflare?.isConnected) {
+        provider = window.solflare;
+      }
+      
+      if (!provider || !provider.isConnected) {
+        throw new Error("Wallet not connected");
+      }
+      
+      const publicKey = provider.publicKey;
+      console.log("[TTC Inpage] ✅ Wallet connected:", publicKey.toString());
+      
+      // Validate program ID
+      if (!payload.programId || payload.programId === "YOUR_PROGRAM_ID_HERE") {
+        throw new Error("⚠️ Program ID not configured!");
+      }
+      
+      const PROGRAM_ID = new PublicKey(payload.programId);
+      
+      // Derive PDAs
+      const textEncoder = new TextEncoder();
+      
+      const [factoryConfigPda] = PublicKey.findProgramAddressSync(
+        [textEncoder.encode("factory_config_v2")],
+        PROGRAM_ID
+      );
+      
+      const [priceCachePda] = PublicKey.findProgramAddressSync(
+        [textEncoder.encode("price_cache"), factoryConfigPda.toBuffer()],
+        PROGRAM_ID
+      );
+      
+      console.log("[TTC Inpage] 📍 Building estimation instruction...");
+      
+      // Get SOL amount in lamports
+      const solAmountLamports = Math.floor(parseFloat(payload.solAmount) * LAMPORTS_PER_SOL);
+      
+      // Find the instruction discriminator for estimateDevTokensForSol from IDL
+      const estimateInstruction = payload.idl.instructions.find(
+        ix => ix.name === "estimateDevTokensForSol" || ix.name === "estimate_dev_tokens_for_sol"
+      );
+      
+      if (!estimateInstruction || !estimateInstruction.discriminator) {
+        throw new Error("Could not find estimateDevTokensForSol in IDL");
+      }
+      
+      const discriminator = new Uint8Array(estimateInstruction.discriminator);
+      console.log("[TTC Inpage] 🔍 Method discriminator:", Array.from(discriminator));
+      
+      // Build instruction data: [8-byte discriminator][8-byte u64 sol_amount]
+      const instructionData = new Uint8Array(16);
+      instructionData.set(discriminator, 0);
+      
+      // Set sol amount as little-endian u64
+      const dataView = new DataView(instructionData.buffer);
+      dataView.setBigUint64(8, BigInt(solAmountLamports), true);
+      
+      console.log("[TTC Inpage] 📦 Instruction data:", Array.from(instructionData));
+      
+      // Create the instruction
+      const instruction = {
+        programId: PROGRAM_ID,
+        keys: [
+          { pubkey: factoryConfigPda, isSigner: false, isWritable: false },
+          { pubkey: priceCachePda, isSigner: false, isWritable: false },
+        ],
+        data: instructionData // Use Uint8Array directly (no Buffer needed in browser)
+      };
+      
+      // Get latest blockhash
+      console.log("[TTC Inpage] Getting latest blockhash for simulation...");
+      const blockhashData = await solanaRpc("getLatestBlockhash", [{ commitment: "finalized" }]);
+      const recentBlockhash = blockhashData.result.value.blockhash;
+      
+      // Create a transaction
+      const transaction = new Transaction();
+      transaction.recentBlockhash = recentBlockhash;
+      transaction.feePayer = publicKey;
+      transaction.add(instruction);
+      
+      // Serialize the transaction
+      const serialized = transaction.serialize({ requireAllSignatures: false, verifySignatures: false });
+      const base64Tx = btoa(String.fromCharCode.apply(null, serialized));
+      
+      // Simulate the transaction
+      console.log("[TTC Inpage] 🎬 Simulating transaction...");
+      const simulation = await solanaRpc("simulateTransaction", [
+        base64Tx,
+        {
+          encoding: "base64",
+          commitment: "processed"
+        }
+      ]);
+      
+      console.log("[TTC Inpage] 📊 Simulation result:", simulation);
+      
+      if (simulation.result.value.err) {
+        throw new Error(`Simulation failed: ${JSON.stringify(simulation.result.value.err)}`);
+      }
+      
+      // Parse the return data from simulation
+      if (!simulation.result.value.returnData) {
+        throw new Error("No return data from simulation");
+      }
+      
+      const returnDataBase64 = simulation.result.value.returnData.data[0];
+      const returnDataBytes = Uint8Array.from(atob(returnDataBase64), c => c.charCodeAt(0));
+      
+      console.log("[TTC Inpage] 📥 Return data bytes:", Array.from(returnDataBytes));
+      
+      // Parse as u64 little-endian (tokens in lamports)
+      const returnView = new DataView(returnDataBytes.buffer);
+      const estimatedLamports = returnView.getBigUint64(0, true);
+      
+      const estimatedTokens = Number(estimatedLamports) / LAMPORTS_PER_SOL;
+      console.log("[TTC Inpage] ✅ Estimated tokens:", estimatedTokens);
+      
+      // Send success response
+      window.postMessage({
+        source: "TTC_INPAGE",
+        type: "TOKEN_ESTIMATION_RESPONSE",
+        success: true,
+        estimatedTokens: estimatedTokens
+      }, "*");
+      
+    } catch (error) {
+      console.error("[TTC Inpage] ❌ Estimation error:", error);
+      window.postMessage({
+        source: "TTC_INPAGE",
+        type: "TOKEN_ESTIMATION_RESPONSE",
+        success: false,
+        error: error.message || "Unknown error",
+        estimatedTokens: 0
+      }, "*");
+    }
   }
 })();

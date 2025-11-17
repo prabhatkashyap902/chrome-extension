@@ -28,6 +28,8 @@ export default function App() {
 
   const [isConnecting, setIsConnecting] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [estimatedTokens, setEstimatedTokens] = useState(0);
+  const [isEstimating, setIsEstimating] = useState(false);
 
   useEffect(() => {
     // Load data from storage
@@ -220,6 +222,94 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
+  // Estimate tokens for SOL amount
+  const estimateTokens = async (amount) => {
+    if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+      setEstimatedTokens(0);
+      return;
+    }
+
+    if (!data.walletAddress) {
+      setEstimatedTokens(0);
+      return;
+    }
+
+    setIsEstimating(true);
+
+    try {
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+
+      if (
+        !tab.url ||
+        (!tab.url.includes("x.com") && !tab.url.includes("twitter.com"))
+      ) {
+        setEstimatedTokens(0);
+        setIsEstimating(false);
+        return;
+      }
+
+      // Load IDL for the estimation
+      const idlUrl = chrome.runtime.getURL("idl.json");
+      const idlResponse = await fetch(idlUrl);
+      const idl = await idlResponse.json();
+
+      const PROGRAM_ID = CONFIG.PROGRAM_ID;
+
+      chrome.tabs.sendMessage(
+        tab.id,
+        {
+          action: "ESTIMATE_TOKENS",
+          payload: {
+            solAmount: amount,
+            idl,
+            programId: PROGRAM_ID,
+          },
+        },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            console.error("Estimation error:", chrome.runtime.lastError);
+            setEstimatedTokens(0);
+            setIsEstimating(false);
+            return;
+          }
+
+          if (
+            response &&
+            response.success &&
+            response.data &&
+            response.data.estimatedTokens !== undefined
+          ) {
+            setEstimatedTokens(response.data.estimatedTokens);
+          } else {
+            setEstimatedTokens(0);
+          }
+          setIsEstimating(false);
+        }
+      );
+    } catch (error) {
+      console.error("Estimation failed:", error);
+      setEstimatedTokens(0);
+      setIsEstimating(false);
+    }
+  };
+
+  // Handle SOL amount change with debounced estimation
+  const handleSolAmountChange = (value) => {
+    setSolAmount(value);
+
+    // Debounce the estimation (wait 500ms after user stops typing)
+    if (window.estimateTimeout) {
+      clearTimeout(window.estimateTimeout);
+    }
+
+    window.estimateTimeout = setTimeout(() => {
+      estimateTokens(value);
+    }, 500); // Wait 500ms after user stops typing
+  };
+
   const handleCreateToken = async () => {
     if (!data.walletAddress) {
       chrome.storage.local.set({ error: "Please connect your wallet first" });
@@ -359,9 +449,11 @@ export default function App() {
           solAmount={solAmount}
           imagePreview={imagePreview}
           isCreating={isCreating}
+          estimatedTokens={estimatedTokens}
+          isEstimating={isEstimating}
           onTokenNameChange={setTokenName}
           onTokenSymbolChange={setTokenSymbol}
-          onSolAmountChange={setSolAmount}
+          onSolAmountChange={handleSolAmountChange}
           onImageUpload={handleImageUpload}
           onCreate={handleCreateToken}
         />

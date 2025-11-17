@@ -5,6 +5,8 @@ export default function TokenCreationForm({
   solAmount,
   imagePreview,
   isCreating,
+  estimatedTokens,
+  isEstimating,
   onTokenNameChange,
   onTokenSymbolChange,
   onSolAmountChange,
@@ -181,6 +183,42 @@ export default function TokenCreationForm({
             fontSize: "13px",
           }}
         />
+
+        {/* Estimated Tokens Display - DISABLED (requires Anchor library) */}
+        {solAmount && parseFloat(solAmount) > 0 && (
+          <div
+            style={{
+              marginTop: "8px",
+              padding: "8px",
+              background: "#1a1a1a",
+              borderRadius: "4px",
+              border: "1px solid #2a2a2a",
+            }}
+          >
+            <div
+              style={{ fontSize: "11px", color: "#888", marginBottom: "4px" }}
+            >
+              Estimated Tokens
+            </div>
+            <div
+              style={{ fontSize: "16px", color: "#AB9FF2", fontWeight: "600" }}
+            >
+              {isEstimating ? (
+                <span style={{ color: "#666" }}>Calculating...</span>
+              ) : estimatedTokens > 0 ? (
+                <span>
+                  ~
+                  {estimatedTokens.toLocaleString(undefined, {
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  tokens
+                </span>
+              ) : (
+                <span style={{ color: "#666" }}>Enter amount to estimate</span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Twitter Link (non-editable) */}
