@@ -110,6 +110,11 @@
     if (event.data.source === "TTC_CONTENT" && event.data.type === "GET_ALLOCATIONS") {
       await getAllocations(event.data.payload);
     }
+    
+    // Handle GET_SOL_BALANCE request
+    if (event.data.source === "TTC_CONTENT" && event.data.type === "GET_SOL_BALANCE") {
+      await getSolBalance(event.data.payload);
+    }
   });
   
   async function connectWallet(walletType) {
@@ -1601,7 +1606,7 @@
       // Assuming the return structure is: [u64; 8] = 64 bytes total
       const returnView = new DataView(returnDataBytes.buffer);
       
-      // Get token decimals to convert from lamports
+      // Get token decimals to convert - ALL values use the SAME decimals
       const mintInfo = await solanaRpc("getAccountInfo", [
         tokenMint.toString(),
         { encoding: "jsonParsed" }
@@ -1611,26 +1616,52 @@
       const divisor = Math.pow(10, decimals);
       
       console.log("[TTC Inpage] 🔢 Token decimals:", decimals);
+      console.log("[TTC Inpage] 📏 Parsing 11 fields from AllocationSummary struct:");
       
-      // Parse all allocation values (8 u64 values)
-      const kolPersonalRemaining = Number(returnView.getBigUint64(0, true)) / divisor;
-      const publicUserSolRemaining = Number(returnView.getBigUint64(8, true)) / divisor;
-      const kolGlobalAllocation = Number(returnView.getBigUint64(16, true)) / divisor;
-      const kolGlobalSold = Number(returnView.getBigUint64(24, true)) / divisor;
-      const kolGlobalRemaining = Number(returnView.getBigUint64(32, true)) / divisor;
-      const publicGlobalAllocation = Number(returnView.getBigUint64(40, true)) / divisor;
-      const publicGlobalSold = Number(returnView.getBigUint64(48, true)) / divisor;
-      const publicGlobalRemaining = Number(returnView.getBigUint64(56, true)) / divisor;
+      // ✅ Parse ALL 11 fields from IDL in correct order
+      const kolPersonalAllocation = Number(returnView.getBigUint64(0, true));
+      const kolPersonalClaimed = Number(returnView.getBigUint64(8, true));
+      const kolPersonalRemaining = Number(returnView.getBigUint64(16, true));
+      const kolGlobalAllocation = Number(returnView.getBigUint64(24, true));
+      const kolGlobalSold = Number(returnView.getBigUint64(32, true));
+      const kolGlobalRemaining = Number(returnView.getBigUint64(40, true));
+      const publicGlobalAllocation = Number(returnView.getBigUint64(48, true));
+      const publicGlobalSold = Number(returnView.getBigUint64(56, true));
+      const publicGlobalRemaining = Number(returnView.getBigUint64(64, true));
+      const publicUserSolSpent = Number(returnView.getBigUint64(72, true));
+      const publicUserSolRemaining = Number(returnView.getBigUint64(80, true));
+      
+      console.log("  Raw [0] kolPersonalAllocation:", kolPersonalAllocation);
+      console.log("  Raw [8] kolPersonalClaimed:", kolPersonalClaimed);
+      console.log("  Raw [16] kolPersonalRemaining:", kolPersonalRemaining);
+      console.log("  Raw [24] kolGlobalAllocation:", kolGlobalAllocation);
+      console.log("  Raw [32] kolGlobalSold:", kolGlobalSold);
+      console.log("  Raw [40] kolGlobalRemaining:", kolGlobalRemaining);
+      console.log("  Raw [48] publicGlobalAllocation:", publicGlobalAllocation);
+      console.log("  Raw [56] publicGlobalSold:", publicGlobalSold);
+      console.log("  Raw [64] publicGlobalRemaining:", publicGlobalRemaining);
+      console.log("  Raw [72] publicUserSolSpent:", publicUserSolSpent);
+      console.log("  Raw [80] publicUserSolRemaining:", publicUserSolRemaining);
+      
+      // Convert using parseFloat and same decimals for all (matching your Anchor code)
+      const kolPersonalRemainingConverted = parseFloat(kolPersonalRemaining.toString()) / divisor;
+      const publicUserSolRemainingConverted = parseFloat(publicUserSolRemaining.toString()) / divisor;
+      const kolGlobalAllocationConverted = parseFloat(kolGlobalAllocation.toString()) / divisor;
+      const kolGlobalSoldConverted = parseFloat(kolGlobalSold.toString()) / divisor;
+      const kolGlobalRemainingConverted = parseFloat(kolGlobalRemaining.toString()) / divisor;
+      const publicGlobalAllocationConverted = parseFloat(publicGlobalAllocation.toString()) / divisor;
+      const publicGlobalSoldConverted = parseFloat(publicGlobalSold.toString()) / divisor;
+      const publicGlobalRemainingConverted = parseFloat(publicGlobalRemaining.toString()) / divisor;
       
       console.log("[TTC Inpage] ✅ Allocation summary:");
-      console.log("  KOL Personal Remaining:", kolPersonalRemaining);
-      console.log("  Public User SOL Remaining:", publicUserSolRemaining);
-      console.log("  Global KOL Allocation:", kolGlobalAllocation);
-      console.log("  Global KOL Sold:", kolGlobalSold);
-      console.log("  Global KOL Remaining:", kolGlobalRemaining);
-      console.log("  Global Public Allocation:", publicGlobalAllocation);
-      console.log("  Global Public Sold:", publicGlobalSold);
-      console.log("  Global Public Remaining:", publicGlobalRemaining);
+      console.log("  KOL Personal Remaining:", kolPersonalRemainingConverted);
+      console.log("  Public User SOL Remaining:", publicUserSolRemainingConverted);
+      console.log("  Global KOL Allocation:", kolGlobalAllocationConverted);
+      console.log("  Global KOL Sold:", kolGlobalSoldConverted);
+      console.log("  Global KOL Remaining:", kolGlobalRemainingConverted);
+      console.log("  Global Public Allocation:", publicGlobalAllocationConverted);
+      console.log("  Global Public Sold:", publicGlobalSoldConverted);
+      console.log("  Global Public Remaining:", publicGlobalRemainingConverted);
       
       // Send success response
       window.postMessage({
@@ -1638,14 +1669,14 @@
         type: "GET_ALLOCATIONS_RESPONSE",
         success: true,
         allocations: {
-          personalKolRemaining: kolPersonalRemaining,
-          personalPublicRemaining: publicUserSolRemaining,
-          globalKolAllocation: kolGlobalAllocation,
-          globalKolSold: kolGlobalSold,
-          globalKolRemaining: kolGlobalRemaining,
-          globalPublicAllocation: publicGlobalAllocation,
-          globalPublicSold: publicGlobalSold,
-          globalPublicRemaining: publicGlobalRemaining
+          personalKolRemaining: kolPersonalRemainingConverted,
+          personalPublicRemaining: publicUserSolRemainingConverted,
+          globalKolAllocation: kolGlobalAllocationConverted,
+          globalKolSold: kolGlobalSoldConverted,
+          globalKolRemaining: kolGlobalRemainingConverted,
+          globalPublicAllocation: publicGlobalAllocationConverted,
+          globalPublicSold: publicGlobalSoldConverted,
+          globalPublicRemaining: publicGlobalRemainingConverted
         }
       }, "*");
       
@@ -1654,6 +1685,93 @@
       window.postMessage({
         source: "TTC_INPAGE",
         type: "GET_ALLOCATIONS_ERROR",
+        success: false,
+        error: error.message || "Unknown error"
+      }, "*");
+    }
+  }
+  
+  // Function to get SOL balance
+  async function getSolBalance(payload) {
+    try {
+      console.log("[TTC Inpage] 💰 Getting SOL balance...");
+      console.log("[TTC Inpage] Wallet Address:", payload.walletAddress);
+      
+      // Wait for web3 to be available
+      if (!window.solanaWeb3) {
+        console.log("[TTC Inpage] Waiting for Solana libraries to load...");
+        await new Promise((resolve, reject) => {
+          let attempts = 0;
+          const maxAttempts = 100; // 10 seconds total (100 * 100ms)
+          
+          const checkInterval = setInterval(() => {
+            attempts++;
+            
+            if (window.solanaWeb3) {
+              console.log(`[TTC Inpage] ✅ Libraries loaded after ${attempts * 100}ms`);
+              clearInterval(checkInterval);
+              resolve();
+            } else if (attempts >= maxAttempts) {
+              clearInterval(checkInterval);
+              console.error("[TTC Inpage] ❌ Library not found:", {
+                solanaWeb3: !!window.solanaWeb3
+              });
+              reject(new Error("Solana web3.js library failed to load"));
+            }
+          }, 100);
+        });
+      }
+      
+      console.log("[TTC Inpage] ✅ Solana libraries are available");
+      
+      // Get web3.js from global window object (injected by IIFE)
+      const { PublicKey, LAMPORTS_PER_SOL } = window.solanaWeb3;
+      
+      // Check for wallet
+      let provider = null;
+      
+      if (window.phantom?.solana?.isConnected) {
+        provider = window.phantom.solana;
+      } else if (window.solana?.isPhantom && window.solana?.isConnected) {
+        provider = window.solana;
+      } else if (window.backpack?.isConnected) {
+        provider = window.backpack;
+      } else if (window.solflare?.isConnected) {
+        provider = window.solflare;
+      }
+      
+      if (!provider || !provider.isConnected) {
+        throw new Error("Wallet not connected");
+      }
+      
+      const walletPublicKey = provider.publicKey;
+      console.log("[TTC Inpage] ✅ Wallet connected:", walletPublicKey.toString());
+      
+      // Get SOL balance using RPC
+      console.log("[TTC Inpage] Getting SOL balance...");
+      const balanceData = await solanaRpc("getBalance", [walletPublicKey.toString()]);
+      
+      if (balanceData.error) {
+        throw new Error(balanceData.error.message || "Failed to get SOL balance");
+      }
+      
+      const lamports = balanceData.result.value;
+      const balance = lamports / LAMPORTS_PER_SOL;
+      console.log("[TTC Inpage] ✅ SOL balance:", balance, "SOL");
+      
+      // Send success response
+      window.postMessage({
+        source: "TTC_INPAGE",
+        type: "GET_SOL_BALANCE_RESPONSE",
+        success: true,
+        balance: balance
+      }, "*");
+      
+    } catch (error) {
+      console.error("[TTC Inpage] ❌ Get SOL Balance error:", error);
+      window.postMessage({
+        source: "TTC_INPAGE",
+        type: "GET_SOL_BALANCE_ERROR",
         success: false,
         error: error.message || "Unknown error"
       }, "*");

@@ -537,6 +537,31 @@ window.addEventListener("message", (event) => {
     }
   }
   
+  // Handle get SOL balance response from inpage
+  if (event.data.source === "TTC_INPAGE" && event.data.type === "GET_SOL_BALANCE_RESPONSE") {
+    console.log("[TTC Content] 💰 Get SOL balance response received:", event.data);
+    if (window.__getSolBalanceCallback) {
+      window.__getSolBalanceCallback({
+        success: true,
+        balance: event.data.balance
+      });
+      delete window.__getSolBalanceCallback;
+    }
+  }
+  
+  // Handle get SOL balance error from inpage
+  if (event.data.source === "TTC_INPAGE" && event.data.type === "GET_SOL_BALANCE_ERROR") {
+    console.error("[TTC Content] ❌ Get SOL balance failed:", event.data.error);
+    if (window.__getSolBalanceCallback) {
+      window.__getSolBalanceCallback({
+        success: false,
+        error: event.data.error,
+        balance: 0
+      });
+      delete window.__getSolBalanceCallback;
+    }
+  }
+  
   // Handle get allocations response from inpage
   if (event.data.source === "TTC_INPAGE" && event.data.type === "GET_ALLOCATIONS_RESPONSE") {
     console.log("[TTC Content] 📊 Get allocations response received:", event.data);
@@ -705,6 +730,28 @@ safeChrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       window.postMessage({
         source: "TTC_CONTENT",
         type: "GET_ALLOCATIONS",
+        payload: request.payload
+      }, "*");
+    }, 1500); // Increased from 500ms to 1500ms
+    
+    // Return true to indicate async response
+    return true;
+  }
+  
+  if (request.action === "GET_SOL_BALANCE") {
+    console.log("[TTC Content] 💰 Get SOL balance request");
+    
+    // Inject inpage if not already done
+    injectInpage();
+    
+    // Store callback for async response
+    window.__getSolBalanceCallback = sendResponse;
+    
+    // Wait for inpage to load then send message - increased delay for library loading
+    setTimeout(() => {
+      window.postMessage({
+        source: "TTC_CONTENT",
+        type: "GET_SOL_BALANCE",
         payload: request.payload
       }, "*");
     }, 1500); // Increased from 500ms to 1500ms

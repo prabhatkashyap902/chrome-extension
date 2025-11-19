@@ -6,6 +6,7 @@ export default function BuySell({
   walletAddress,
   walletType,
   onClose,
+  onBalanceRefresh,
 }) {
   const [mode, setMode] = useState("buy"); // "buy" or "sell"
   const [amount, setAmount] = useState("");
@@ -13,25 +14,19 @@ export default function BuySell({
   const [isEstimating, setIsEstimating] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [ownedTokens, setOwnedTokens] = useState(0);
-  const [solBalance, setSolBalance] = useState(0); // ✅ Add SOL balance
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [userAllocation, setUserAllocation] = useState(0);
+  const [userAllocation, setUserAllocation] = useState(0); // For BUY mode - stores KOL tokens or PUBLIC SOL
   const [isLoadingAllocation, setIsLoadingAllocation] = useState(false);
 
   // Debounce timer
   let estimateTimer = null;
 
-  // Fetch owned token balance when switching to sell mode
+  // ✅ Fetch allocations when in BUY mode
   useEffect(() => {
-    if (mode === "sell" && tokenData?.tokenAddress && walletAddress) {
-      fetchOwnedTokenBalance();
-    }
-
-    // Fetch SOL balance whenever component mounts or wallet changes
-    if (walletAddress) {
-      fetchSolBalance();
+    if (mode === "buy" && tokenData?.tokenAddress && walletAddress) {
+      fetchUserAllocation();
     }
 
     // Clear error/success messages when switching modes
@@ -42,6 +37,92 @@ export default function BuySell({
     setAmount("");
     setEstimatedAmount(0);
   }, [mode, tokenData?.tokenAddress, walletAddress]);
+
+  // Fetch owned token balance when switching to sell mode
+  useEffect(() => {
+    if (mode === "sell" && tokenData?.tokenAddress && walletAddress) {
+      fetchOwnedTokenBalance();
+    }
+  }, [mode, tokenData?.tokenAddress, walletAddress]);
+
+  const fetchUserAllocation = async () => {
+    setIsLoadingAllocation(true);
+
+    try {
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+
+      if (
+        !tab.url ||
+        (!tab.url.includes("x.com") && !tab.url.includes("twitter.com"))
+      ) {
+        setUserAllocation(0);
+        setIsLoadingAllocation(false);
+        return;
+      }
+
+      // Load IDL
+      const idlUrl = chrome.runtime.getURL("idl.json");
+      const idlResponse = await fetch(idlUrl);
+      const idl = await idlResponse.json();
+
+      const PROGRAM_ID = CONFIG.PROGRAM_ID;
+
+      chrome.tabs.sendMessage(
+        tab.id,
+        {
+          action: "GET_ALLOCATIONS",
+          payload: {
+            tokenAddress: tokenData.tokenAddress,
+            saleAuthority: tokenData.saleAuthority || "",
+            phase: tokenData.phase || "public", // "kol" or "public"
+            walletAddress: walletAddress,
+            idl,
+            programId: PROGRAM_ID,
+          },
+        },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            console.error("Allocation fetch error:", chrome.runtime.lastError);
+            setUserAllocation(0);
+            setIsLoadingAllocation(false);
+            return;
+          }
+
+          if (response && response.success && response.allocations) {
+            console.log("✅ Allocations received:", response.allocations);
+
+            // ✅ Set allocation based on phase
+            // KOL phase → personalKolRemaining (tokens)
+            // PUBLIC phase → personalPublicRemaining (SOL)
+            const phase = tokenData.phase || "public";
+            if (phase === "kol") {
+              setUserAllocation(response.allocations.personalKolRemaining || 0);
+              console.log(
+                `📊 KOL phase - Remaining tokens: ${response.allocations.personalKolRemaining}`
+              );
+            } else {
+              setUserAllocation(
+                response.allocations.personalPublicRemaining || 0
+              );
+              console.log(
+                `📊 PUBLIC phase - Remaining SOL: ${response.allocations.personalPublicRemaining}`
+              );
+            }
+          } else {
+            setUserAllocation(0);
+          }
+          setIsLoadingAllocation(false);
+        }
+      );
+    } catch (error) {
+      console.error("Allocation fetch failed:", error);
+      setUserAllocation(0);
+      setIsLoadingAllocation(false);
+    }
+  };
 
   const fetchOwnedTokenBalance = async () => {
     setIsLoadingBalance(true);
@@ -96,58 +177,6 @@ export default function BuySell({
     }
   };
 
-  const fetchSolBalance = async () => {
-    setIsLoadingBalance(true);
-
-    try {
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-
-      if (
-        !tab.url ||
-        (!tab.url.includes("x.com") && !tab.url.includes("twitter.com"))
-      ) {
-        setSolBalance(0);
-        setIsLoadingBalance(false);
-        return;
-      }
-
-      const PROGRAM_ID = CONFIG.PROGRAM_ID;
-
-      chrome.tabs.sendMessage(
-        tab.id,
-        {
-          action: "GET_SOL_BALANCE",
-          payload: {
-            walletAddress: walletAddress,
-            programId: PROGRAM_ID,
-          },
-        },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            console.error("Balance fetch error:", chrome.runtime.lastError);
-            setSolBalance(0);
-            setIsLoadingBalance(false);
-            return;
-          }
-
-          if (response && response.success && response.balance !== undefined) {
-            setSolBalance(response.balance || 0);
-          } else {
-            setSolBalance(0);
-          }
-          setIsLoadingBalance(false);
-        }
-      );
-    } catch (error) {
-      console.error("Balance fetch failed:", error);
-      setSolBalance(0);
-      setIsLoadingBalance(false);
-    }
-  };
-
   const handlePercentageClick = (percentage) => {
     if (mode === "sell") {
       if (ownedTokens <= 0) return;
@@ -155,8 +184,6 @@ export default function BuySell({
       setAmount(calculatedAmount);
       handleAmountChange(calculatedAmount);
     } else if (mode === "buy") {
-      // TODO: For buy mode, we need user's SOL allocation
-      // For now, using a placeholder. Will implement when allocation function is provided.
       if (userAllocation <= 0) return;
       const calculatedAmount = ((userAllocation * percentage) / 100).toFixed(9);
       setAmount(calculatedAmount);
@@ -318,23 +345,58 @@ export default function BuySell({
           }
 
           if (response && response.success) {
-            console.log("✅ Transaction successful:", response.txHash);
+            console.log("✅ Transaction successful:", response);
+            const txHash =
+              response.data?.txHash || response.txHash || "unknown";
+
+            // ✅ Optimistic UI update
+            if (mode === "sell") {
+              const soldAmount = parseFloat(amount);
+              setOwnedTokens((prevTokens) =>
+                Math.max(0, prevTokens - soldAmount)
+              );
+              console.log(
+                `📉 Optimistic update: Subtracted ${soldAmount} tokens`
+              );
+            } else if (mode === "buy") {
+              // ✅ Optimistic UI update for BUY - subtract SOL from allocation
+              const spentSOL = parseFloat(amount);
+              setUserAllocation((prevAlloc) =>
+                Math.max(0, prevAlloc - spentSOL)
+              );
+              console.log(
+                `📉 Optimistic update: Subtracted ${spentSOL} SOL from allocation`
+              );
+            }
+
             setAmount("");
             setEstimatedAmount(0);
             setSuccess(
               `🎉 ${
                 mode === "buy" ? "Purchase" : "Sale"
-              } successful! TX: ${response.txHash.slice(0, 8)}...`
+              } successful! TX: ${txHash.slice(0, 8)}...`
             );
             setError(null);
 
-            // Auto-hide success message after 5 seconds
-            setTimeout(() => setSuccess(null), 5000);
+            // ✅ Wait for blockchain confirmation before fetching SOL balance (3-5 seconds)
+            console.log(
+              "⏳ Waiting for blockchain confirmation for SOL balance..."
+            );
+            setTimeout(() => {
+              console.log("🔄 Fetching updated SOL balance...");
+              onBalanceRefresh(); // Refresh SOL balance in App.jsx
+            }, 4000); // Wait 4 seconds for SOL balance update
+
+            setIsProcessing(false);
+
+            // Auto-hide success message after 8 seconds
+            setTimeout(() => setSuccess(null), 8000);
           } else {
             console.error("❌ Transaction failed:", response?.error);
 
             // Parse error message
-            let errorMessage = response?.error || "Transaction failed.";
+            let errorMessage =
+              response?.error || response?.data?.error || "Transaction failed.";
 
             // Check for user rejection
             if (
@@ -352,10 +414,16 @@ export default function BuySell({
                 "❌ Transaction simulation failed. Check your balance and try again.";
             }
 
+            // ✅ For failed transactions, fetch balances immediately (no need to wait)
+            onBalanceRefresh(); // Refresh SOL balance in App.jsx
+            if (mode === "sell") {
+              fetchOwnedTokenBalance();
+            }
+
             setError(errorMessage);
             setSuccess(null);
+            setIsProcessing(false);
           }
-          setIsProcessing(false);
         }
       );
     } catch (error) {
@@ -522,13 +590,54 @@ export default function BuySell({
           </div>
           <div
             style={{
-              fontSize: "11px",
-              fontFamily: "monospace",
-              color: "#1d9bf0",
-              wordBreak: "break-all",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              justifyContent: "space-between",
             }}
           >
-            {tokenData?.tokenAddress || "—"}
+            <div
+              style={{
+                fontSize: "11px",
+                fontFamily: "monospace",
+                color: "#1d9bf0",
+                flex: 1,
+              }}
+            >
+              {tokenData?.tokenAddress
+                ? `${tokenData.tokenAddress.slice(
+                    0,
+                    6
+                  )}...${tokenData.tokenAddress.slice(-6)}`
+                : "—"}
+            </div>
+            <button
+              onClick={() => {
+                window.open(
+                  `https://icm-social-app.vercel.app/t/${tokenData?.tokenAddress}`,
+                  "_blank"
+                );
+              }}
+              style={{
+                padding: "4px 10px",
+                background: "#1d9bf0",
+                color: "#fff",
+                border: "none",
+                borderRadius: "4px",
+                fontSize: "10px",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                transition: "all 0.2s",
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = "#1a8cd8";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = "#1d9bf0";
+              }}
+            >
+              Visit Website
+            </button>
           </div>
         </div>
       </div>
@@ -551,6 +660,22 @@ export default function BuySell({
           >
             {mode === "buy" ? "SOL Amount" : "Token Amount"}
           </label>
+
+          {/* ✅ Show allocation in BUY mode - KOL tokens or PUBLIC SOL */}
+          {mode === "buy" && (
+            <div style={{ fontSize: "11px", color: "#888" }}>
+              {isLoadingAllocation ? (
+                "Loading..."
+              ) : (
+                <>
+                  Remaining: {userAllocation.toLocaleString()}{" "}
+                  {tokenData?.phase === "kol"
+                    ? tokenData?.symbol || "tokens"
+                    : "SOL"}
+                </>
+              )}
+            </div>
+          )}
 
           {/* Show owned tokens in sell mode */}
           {mode === "sell" && (
@@ -679,35 +804,36 @@ export default function BuySell({
         )}
       </div>
 
-      {/* Estimation Display */}
-      <div
-        style={{
-          background: "#111",
-          border: "1px solid #333",
-          borderRadius: "6px",
-          padding: "10px",
-          marginBottom: "12px",
-          fontSize: "12px",
-        }}
-      >
-        <div style={{ color: "#888", marginBottom: "4px" }}>
-          {mode === "buy" ? "You will receive" : "You will receive"}
+      {/* Estimation Display - Only show in BUY mode */}
+      {mode === "buy" && (
+        <div
+          style={{
+            background: "#111",
+            border: "1px solid #333",
+            borderRadius: "6px",
+            padding: "10px",
+            marginBottom: "12px",
+            fontSize: "12px",
+          }}
+        >
+          <div style={{ color: "#888", marginBottom: "4px" }}>
+            You will receive
+          </div>
+          <div style={{ color: "#fff", fontSize: "14px" }}>
+            {isEstimating ? (
+              <span style={{ color: "#888" }}>Calculating...</span>
+            ) : estimatedAmount > 0 ? (
+              <>
+                ~{estimatedAmount.toLocaleString()} {tokenData?.symbol}
+              </>
+            ) : (
+              <span style={{ color: "#888" }}>
+                Enter amount to see estimation
+              </span>
+            )}
+          </div>
         </div>
-        <div style={{ color: "#fff", fontSize: "14px" }}>
-          {isEstimating ? (
-            <span style={{ color: "#888" }}>Calculating...</span>
-          ) : estimatedAmount > 0 ? (
-            <>
-              ~{estimatedAmount.toLocaleString()}{" "}
-              {mode === "buy" ? tokenData?.symbol : "SOL"}
-            </>
-          ) : (
-            <span style={{ color: "#888" }}>
-              Enter amount to see estimation
-            </span>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* Buy/Sell Button */}
       <button

@@ -32,6 +32,10 @@ export default function App() {
   const [estimatedTokens, setEstimatedTokens] = useState(0);
   const [isEstimating, setIsEstimating] = useState(false);
 
+  // SOL balance state
+  const [solBalance, setSolBalance] = useState(0);
+  const [isLoadingSolBalance, setIsLoadingSolBalance] = useState(false);
+
   // Buy/Sell state
   const [showBuySell, setShowBuySell] = useState(false);
   const [buySellTokenData, setBuySellTokenData] = useState(null);
@@ -64,6 +68,11 @@ export default function App() {
             error: result.error || "",
             walletType: result.walletType || "",
           });
+
+          // ✅ Fetch SOL balance when wallet is connected
+          if (result.walletAddress) {
+            fetchSolBalance(result.walletAddress);
+          }
 
           // Load tweet data for form (only if buy/sell is not active)
           if (result.tweetData && !result.buySellTokenData) {
@@ -445,6 +454,71 @@ export default function App() {
     setShowBuySell(false);
   };
 
+  // ✅ Fetch SOL balance
+  const fetchSolBalance = async (walletAddress) => {
+    if (!walletAddress) {
+      setSolBalance(0);
+      return;
+    }
+
+    setIsLoadingSolBalance(true);
+
+    try {
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+
+      if (
+        !tab.url ||
+        (!tab.url.includes("x.com") && !tab.url.includes("twitter.com"))
+      ) {
+        setSolBalance(0);
+        setIsLoadingSolBalance(false);
+        return;
+      }
+
+      const PROGRAM_ID = CONFIG.PROGRAM_ID;
+
+      chrome.tabs.sendMessage(
+        tab.id,
+        {
+          action: "GET_SOL_BALANCE",
+          payload: {
+            walletAddress: walletAddress,
+            programId: PROGRAM_ID,
+          },
+        },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            console.error("Balance fetch error:", chrome.runtime.lastError);
+            setSolBalance(0);
+            setIsLoadingSolBalance(false);
+            return;
+          }
+
+          if (response && response.success && response.balance !== undefined) {
+            setSolBalance(response.balance || 0);
+          } else {
+            setSolBalance(0);
+          }
+          setIsLoadingSolBalance(false);
+        }
+      );
+    } catch (error) {
+      console.error("Balance fetch failed:", error);
+      setSolBalance(0);
+      setIsLoadingSolBalance(false);
+    }
+  };
+
+  // ✅ Handle balance refresh callback from BuySell component
+  const handleBalanceRefresh = () => {
+    if (data.walletAddress) {
+      fetchSolBalance(data.walletAddress);
+    }
+  };
+
   return (
     <div
       style={{
@@ -472,6 +546,8 @@ export default function App() {
         walletAddress={data.walletAddress}
         walletType={data.walletType}
         isConnecting={isConnecting}
+        solBalance={solBalance}
+        isLoadingSolBalance={isLoadingSolBalance}
         onConnect={handleConnectWallet}
         onDisconnect={handleDisconnectWallet}
       />
@@ -536,6 +612,7 @@ export default function App() {
             walletAddress={data.walletAddress}
             walletType={data.walletType}
             onClose={handleCloseBuySell}
+            onBalanceRefresh={handleBalanceRefresh}
           />
         )}
     </div>
