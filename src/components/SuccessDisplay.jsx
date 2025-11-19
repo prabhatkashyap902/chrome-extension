@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 export default function SuccessDisplay({
   tokenName,
@@ -11,19 +11,11 @@ export default function SuccessDisplay({
   const [loadingTokenAddress, setLoadingTokenAddress] = useState(false);
   const [tokenError, setTokenError] = useState(null);
 
-  // Fetch token address from API when component mounts
-  useEffect(() => {
-    if (tokenMint) {
-      fetchTokenAddress();
-    }
-  }, [tokenMint]);
-
-  async function fetchTokenAddress() {
+  const fetchTokenAddress = useCallback(async () => {
     setLoadingTokenAddress(true);
     setTokenError(null);
 
     try {
-      // Get API URL from config
       const response = await fetch(chrome.runtime.getURL("config.js"));
       const configText = await response.text();
       const apiUrlMatch = configText.match(/API_URL:\s*["']([^"']+)["']/);
@@ -34,7 +26,6 @@ export default function SuccessDisplay({
 
       const apiUrl = apiUrlMatch[1];
 
-      // Make API call to get token details
       const tokenResponse = await fetch(`${apiUrl}/token/${tokenMint}`, {
         method: "GET",
         headers: {
@@ -48,7 +39,6 @@ export default function SuccessDisplay({
 
       const tokenData = await tokenResponse.json();
 
-      // Extract token address from response (adjust based on your API structure)
       const address =
         tokenData.address ||
         tokenData.token_address ||
@@ -58,12 +48,17 @@ export default function SuccessDisplay({
     } catch (error) {
       console.error("[TTC] Error fetching token address:", error);
       setTokenError(error.message);
-      // Fallback to using the tokenMint as address
       setTokenAddress(tokenMint);
     } finally {
       setLoadingTokenAddress(false);
     }
-  }
+  }, [tokenMint]);
+
+  useEffect(() => {
+    if (tokenMint) {
+      fetchTokenAddress();
+    }
+  }, [tokenMint, fetchTokenAddress]);
 
   return (
     <div>

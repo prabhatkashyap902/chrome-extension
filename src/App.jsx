@@ -5,6 +5,7 @@ import TokenCreationForm from "./components/TokenCreationForm";
 import SuccessDisplay from "./components/SuccessDisplay";
 import StatusDisplay from "./components/StatusDisplay";
 import Instructions from "./components/Instructions";
+import BuySell from "./components/BuySell";
 
 export default function App() {
   const [data, setData] = useState({
@@ -21,7 +22,7 @@ export default function App() {
   const [tweetData, setTweetData] = useState(null);
   const [tokenName, setTokenName] = useState("");
   const [tokenSymbol, setTokenSymbol] = useState("");
-  const [solAmount, setSolAmount] = useState("0.1");
+  const [solAmount, setSolAmount] = useState(""); // Empty by default
   const [imagePreview, setImagePreview] = useState("");
   const [uploadedImage, setUploadedImage] = useState("");
   const [uploadedImageFilename, setUploadedImageFilename] = useState("");
@@ -30,6 +31,13 @@ export default function App() {
   const [isCreating, setIsCreating] = useState(false);
   const [estimatedTokens, setEstimatedTokens] = useState(0);
   const [isEstimating, setIsEstimating] = useState(false);
+
+  // Buy/Sell state
+  const [showBuySell, setShowBuySell] = useState(false);
+  const [buySellTokenData, setBuySellTokenData] = useState(null);
+
+  // Track which mode is active
+  const [activeMode, setActiveMode] = useState(null); // "create" or "buysell"
 
   useEffect(() => {
     // Load data from storage
@@ -44,6 +52,7 @@ export default function App() {
           "error",
           "walletType",
           "tweetData",
+          "buySellTokenData",
         ],
         (result) => {
           setData({
@@ -56,11 +65,12 @@ export default function App() {
             walletType: result.walletType || "",
           });
 
-          // Load tweet data for form
-          if (result.tweetData) {
+          // Load tweet data for form (only if buy/sell is not active)
+          if (result.tweetData && !result.buySellTokenData) {
             setTweetData(result.tweetData);
             setTokenName(result.tweetData.tokenName || "");
             setTokenSymbol(result.tweetData.tokenSymbol || "");
+            setActiveMode("create");
 
             // Set image preview if available
             if (
@@ -73,6 +83,24 @@ export default function App() {
                 result.tweetData.tweetImages[0].filename
               );
             }
+          }
+
+          // Load buy/sell token data
+          if (result.buySellTokenData) {
+            setBuySellTokenData(result.buySellTokenData);
+            setShowBuySell(true);
+            setActiveMode("buysell");
+            // Clear create token data when buy/sell is active
+            setTweetData(null);
+            setTokenName("");
+            setTokenSymbol("");
+            setSolAmount("");
+            setImagePreview("");
+            setUploadedImage("");
+            setUploadedImageFilename("");
+          } else {
+            setBuySellTokenData(null);
+            setShowBuySell(false);
           }
         }
       );
@@ -202,7 +230,7 @@ export default function App() {
       setTokenSymbol("");
       setImagePreview("");
       setUploadedImage("");
-      setSolAmount("0.1");
+      setSolAmount("");
     } catch (error) {
       console.error("Failed to disconnect wallet:", error);
     }
@@ -406,7 +434,15 @@ export default function App() {
     setTokenSymbol("");
     setImagePreview("");
     setUploadedImage("");
-    setSolAmount("0.1");
+    setSolAmount("");
+  };
+
+  const handleCloseBuySell = () => {
+    chrome.storage.local.set({
+      buySellTokenData: null,
+    });
+    setBuySellTokenData(null);
+    setShowBuySell(false);
   };
 
   return (
@@ -440,43 +476,68 @@ export default function App() {
         onDisconnect={handleDisconnectWallet}
       />
 
-      {/* Token Creation Form - Only show if wallet connected and tweet data exists */}
-      {data.walletAddress && tweetData && !data.txHash && (
-        <TokenCreationForm
-          tweetData={tweetData}
-          tokenName={tokenName}
-          tokenSymbol={tokenSymbol}
-          solAmount={solAmount}
-          imagePreview={imagePreview}
-          isCreating={isCreating}
-          estimatedTokens={estimatedTokens}
-          isEstimating={isEstimating}
-          onTokenNameChange={setTokenName}
-          onTokenSymbolChange={setTokenSymbol}
-          onSolAmountChange={handleSolAmountChange}
-          onImageUpload={handleImageUpload}
-          onCreate={handleCreateToken}
-        />
-      )}
+      {/* Token Creation Form - Only show if wallet connected and tweet data exists and NOT in buysell mode */}
+      {data.walletAddress &&
+        tweetData &&
+        !data.txHash &&
+        activeMode === "create" &&
+        !showBuySell && (
+          <TokenCreationForm
+            tweetData={tweetData}
+            tokenName={tokenName}
+            tokenSymbol={tokenSymbol}
+            solAmount={solAmount}
+            imagePreview={imagePreview}
+            isCreating={isCreating}
+            estimatedTokens={estimatedTokens}
+            isEstimating={isEstimating}
+            onTokenNameChange={setTokenName}
+            onTokenSymbolChange={setTokenSymbol}
+            onSolAmountChange={handleSolAmountChange}
+            onImageUpload={handleImageUpload}
+            onCreate={handleCreateToken}
+          />
+        )}
 
-      {/* Status and Error Display */}
-      <StatusDisplay status={data.status} error={data.error} />
+      {/* Status and Error Display - Hide when showing BuySell */}
+      {!showBuySell && activeMode !== "buysell" && (
+        <StatusDisplay status={data.status} error={data.error} />
+      )}
 
       {/* Success Display - Show token details */}
-      {data.status === "success" && data.txHash && (
-        <SuccessDisplay
-          tokenName={tokenName}
-          tokenSymbol={tokenSymbol}
-          txHash={data.txHash}
-          tokenMint={data.tokenMint}
-          onCreateAnother={handleCreateAnother}
-        />
-      )}
+      {!showBuySell &&
+        activeMode !== "buysell" &&
+        data.status === "success" &&
+        data.txHash && (
+          <SuccessDisplay
+            tokenName={tokenName}
+            tokenSymbol={tokenSymbol}
+            txHash={data.txHash}
+            tokenMint={data.tokenMint}
+            onCreateAnother={handleCreateAnother}
+          />
+        )}
 
       {/* Instructions */}
-      {!data.txHash && !data.error && data.walletAddress && !tweetData && (
-        <Instructions />
-      )}
+      {!data.txHash &&
+        !data.error &&
+        data.walletAddress &&
+        !tweetData &&
+        !showBuySell &&
+        activeMode !== "buysell" && <Instructions />}
+
+      {/* Buy/Sell Section - Show when viewing other member's token */}
+      {showBuySell &&
+        buySellTokenData &&
+        data.walletAddress &&
+        activeMode === "buysell" && (
+          <BuySell
+            tokenData={buySellTokenData}
+            walletAddress={data.walletAddress}
+            walletType={data.walletType}
+            onClose={handleCloseBuySell}
+          />
+        )}
     </div>
   );
 }

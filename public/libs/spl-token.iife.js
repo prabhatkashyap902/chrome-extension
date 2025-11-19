@@ -1,1 +1,1 @@
-Package not found: @soasdasdasdalana/spl-token
+Not found: /@solana/spl-token@0.4.14/lib/index.iife.js

@@ -84,22 +84,14 @@ function injectInpage() {
   web3Script.onload = () => {
     console.log("[TTC Content] ✅ Solana web3.js loaded");
     
-    // Inject SPL Token IIFE bundle
-    const splTokenScript = document.createElement("script");
-    splTokenScript.src = safeChrome.runtime.getURL("libs/spl-token.iife.js");
-    splTokenScript.onload = () => {
-      console.log("[TTC Content] ✅ SPL Token loaded");
-      
-      // Finally inject our inpage script
-      const inpageScript = document.createElement("script");
-      inpageScript.src = safeChrome.runtime.getURL("inpage.js");
-      inpageScript.id = "__ttc_inpage";
-      inpageScript.onload = () => {
-        console.log("[TTC Content] ✅ Inpage script loaded");
-      };
-      document.documentElement.appendChild(inpageScript);
+    // Inject our inpage script
+    const inpageScript = document.createElement("script");
+    inpageScript.src = safeChrome.runtime.getURL("inpage.js");
+    inpageScript.id = "__ttc_inpage";
+    inpageScript.onload = () => {
+      console.log("[TTC Content] ✅ Inpage script loaded");
     };
-    document.documentElement.appendChild(splTokenScript);
+    document.documentElement.appendChild(inpageScript);
   };
   document.documentElement.appendChild(web3Script);
 }
@@ -280,6 +272,7 @@ async function addTokenButton(tweetElement) {
                 type: img.type
               }))
             },
+            buySellTokenData: null,  // ✅ Clear buy/sell data when switching to create mode
             status: "Ready to create token",
             error: "",
             txHash: "",  // Clear old transaction hash
@@ -317,8 +310,38 @@ async function addTokenButton(tweetElement) {
         `;
         
         button.onclick = () => {
-          console.log("[TTC Content] 💰 Buy/Sell Token clicked, opening:", `https://icm-social-app.vercel.app/t/${existingToken.token_address}`);
-          window.open(`https://icm-social-app.vercel.app/t/${existingToken.token_address}`, '_blank');
+          console.log("[TTC Content] 💰 Buy/Sell Token clicked for:", existingToken.token_address);
+          
+          // Save token data to storage for the popup
+          safeChrome.storage.local.set({
+            buySellTokenData: {
+              tokenAddress: existingToken.token_address,
+              name: existingToken.name,
+              symbol: existingToken.symbol,
+              image: existingToken.token_image_url, // Correct field
+              marketCap: existingToken.total_usd_raised || 0, // Correct field
+              price: existingToken.last_trade_price_usd || 0, // Correct field
+              phase: existingToken.phase || existingToken.sale_phase || "public", // Add phase
+              creatorUsername: author,
+              saleAuthority: existingToken.sale_authority || existingToken.creator_wallet || "" // ⚠️ YOU NEED TO ADD THIS TO YOUR API!
+            },
+            tweetData: null, // Clear any existing tweet data
+            txHash: "", // Clear any transaction hash
+            tokenMint: "" // Clear any token mint
+          }, () => {
+            console.log("[TTC Content] ✅ Token data saved to storage");
+            
+            // Try to open the popup
+            safeChrome.runtime.sendMessage({ action: "OPEN_POPUP" });
+            
+            // Show a notification that data is ready
+            button.textContent = "✓ Opening...";
+            button.style.background = "#059669";
+            setTimeout(() => {
+              button.textContent = "Buy/Sell Token";
+              button.style.background = "#10B981";
+            }, 2000);
+          });
         };
         
         tweetElement.style.position = "relative";
@@ -354,6 +377,12 @@ setTimeout(() => {
     safeChrome.storage.local.set({ myUsername });
   }
 }, 1500);
+
+// Inject libraries and inpage script immediately on page load
+setTimeout(() => {
+  console.log("[TTC Content] 🚀 Injecting libraries and inpage script...");
+  injectInpage();
+}, 100);
 
 // Listen for messages from inpage
 window.addEventListener("message", (event) => {
@@ -458,6 +487,80 @@ window.addEventListener("message", (event) => {
       delete window.__estimateTokensCallback;
     }
   }
+  
+  // Handle buy/sell token response from inpage
+  if (event.data.source === "TTC_INPAGE" && event.data.type === "BUY_SELL_TOKEN_RESPONSE") {
+    console.log("[TTC Content] 💰 Buy/Sell token response received:", event.data);
+    if (window.__buySellTokenCallback) {
+      window.__buySellTokenCallback({
+        success: true,
+        data: event.data
+      });
+      delete window.__buySellTokenCallback;
+    }
+  }
+  
+  // Handle buy/sell token error from inpage
+  if (event.data.source === "TTC_INPAGE" && event.data.type === "BUY_SELL_TOKEN_ERROR") {
+    console.error("[TTC Content] ❌ Buy/Sell token failed:", event.data.error);
+    if (window.__buySellTokenCallback) {
+      window.__buySellTokenCallback({
+        success: false,
+        error: event.data.error
+      });
+      delete window.__buySellTokenCallback;
+    }
+  }
+  
+  // Handle get token balance response from inpage
+  if (event.data.source === "TTC_INPAGE" && event.data.type === "GET_TOKEN_BALANCE_RESPONSE") {
+    console.log("[TTC Content] 💼 Get token balance response received:", event.data);
+    if (window.__getTokenBalanceCallback) {
+      window.__getTokenBalanceCallback({
+        success: true,
+        balance: event.data.balance
+      });
+      delete window.__getTokenBalanceCallback;
+    }
+  }
+  
+  // Handle get token balance error from inpage
+  if (event.data.source === "TTC_INPAGE" && event.data.type === "GET_TOKEN_BALANCE_ERROR") {
+    console.error("[TTC Content] ❌ Get token balance failed:", event.data.error);
+    if (window.__getTokenBalanceCallback) {
+      window.__getTokenBalanceCallback({
+        success: false,
+        error: event.data.error,
+        balance: 0
+      });
+      delete window.__getTokenBalanceCallback;
+    }
+  }
+  
+  // Handle get allocations response from inpage
+  if (event.data.source === "TTC_INPAGE" && event.data.type === "GET_ALLOCATIONS_RESPONSE") {
+    console.log("[TTC Content] 📊 Get allocations response received:", event.data);
+    if (window.__getAllocationsCallback) {
+      window.__getAllocationsCallback({
+        success: true,
+        allocations: event.data.allocations
+      });
+      delete window.__getAllocationsCallback;
+    }
+  }
+  
+  // Handle get allocations error from inpage
+  if (event.data.source === "TTC_INPAGE" && event.data.type === "GET_ALLOCATIONS_ERROR") {
+    console.error("[TTC Content] ❌ Get allocations failed:", event.data.error);
+    if (window.__getAllocationsCallback) {
+      window.__getAllocationsCallback({
+        success: false,
+        error: event.data.error,
+        allocations: []
+      });
+      delete window.__getAllocationsCallback;
+    }
+  }
 });
 
 // Listen for messages from popup
@@ -539,6 +642,72 @@ safeChrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         payload: request.payload
       }, "*");
     }, 500);
+    
+    // Return true to indicate async response
+    return true;
+  }
+  
+  if (request.action === "BUY_SELL_TOKEN") {
+    console.log("[TTC Content] 💰 Buy/Sell token request");
+    
+    // Inject inpage if not already done
+    injectInpage();
+    
+    // Store callback for async response
+    window.__buySellTokenCallback = sendResponse;
+    
+    // Wait for inpage to load then send message - increased delay for library loading
+    setTimeout(() => {
+      window.postMessage({
+        source: "TTC_CONTENT",
+        type: "BUY_SELL_TOKEN",
+        payload: request.payload
+      }, "*");
+    }, 1500); // Increased from 500ms to 1500ms
+    
+    // Return true to indicate async response
+    return true;
+  }
+  
+  if (request.action === "GET_TOKEN_BALANCE") {
+    console.log("[TTC Content] 💼 Get token balance request");
+    
+    // Inject inpage if not already done
+    injectInpage();
+    
+    // Store callback for async response
+    window.__getTokenBalanceCallback = sendResponse;
+    
+    // Wait for inpage to load then send message - increased delay for library loading
+    setTimeout(() => {
+      window.postMessage({
+        source: "TTC_CONTENT",
+        type: "GET_TOKEN_BALANCE",
+        payload: request.payload
+      }, "*");
+    }, 1500); // Increased from 500ms to 1500ms
+    
+    // Return true to indicate async response
+    return true;
+  }
+  
+  if (request.action === "GET_ALLOCATIONS") {
+    console.log("[TTC Content] 📊 Get allocations request");
+    
+    // Inject inpage if not already done
+    injectInpage();
+    
+    // Store callback for async response
+    window.__getAllocationsCallback = sendResponse;
+    
+    // Wait for inpage to load then send message - increased delay for library loading
+    setTimeout(() => {
+      window.postMessage({
+        source: "TTC_CONTENT",
+        type: "GET_ALLOCATIONS",
+        payload: request.payload
+      }, "*");
+    }, 1500); // Increased from 500ms to 1500ms
     
     // Return true to indicate async response
     return true;
