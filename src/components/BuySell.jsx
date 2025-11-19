@@ -23,6 +23,15 @@ export default function BuySell({
   // Debounce timer
   let estimateTimer = null;
 
+  // ✅ Determine if we're in KOL phase (case-insensitive check)
+  const isKolPhase = tokenData?.phase?.toLowerCase() === "kol";
+
+  // 🔍 Debug log to see actual phase value
+  useEffect(() => {
+    console.log("🔍 [BuySell] Token Phase:", tokenData?.phase);
+    console.log("🔍 [BuySell] isKolPhase:", isKolPhase);
+  }, [tokenData?.phase, isKolPhase]);
+
   // ✅ Fetch allocations when in BUY mode
   useEffect(() => {
     if (mode === "buy" && tokenData?.tokenAddress && walletAddress) {
@@ -94,10 +103,10 @@ export default function BuySell({
           if (response && response.success && response.allocations) {
             console.log("✅ Allocations received:", response.allocations);
 
-            // ✅ Set allocation based on phase
+            // ✅ Set allocation based on phase (case-insensitive)
             // KOL phase → personalKolRemaining (tokens)
             // PUBLIC phase → personalPublicRemaining (SOL)
-            const phase = tokenData.phase || "public";
+            const phase = (tokenData.phase || "public").toLowerCase();
             if (phase === "kol") {
               setUserAllocation(response.allocations.personalKolRemaining || 0);
               console.log(
@@ -226,8 +235,8 @@ export default function BuySell({
     }
   };
 
-  const handleEstimateTokens = async (solAmount) => {
-    if (!solAmount || parseFloat(solAmount) <= 0) {
+  const handleEstimateTokens = async (inputAmount) => {
+    if (!inputAmount || parseFloat(inputAmount) <= 0) {
       setEstimatedAmount(0);
       return;
     }
@@ -256,15 +265,32 @@ export default function BuySell({
 
       const PROGRAM_ID = CONFIG.PROGRAM_ID;
 
+      // ✅ For KOL phase: convert tokens → SOL (reverse estimation)
+      // For PUBLIC phase: convert SOL → tokens (normal estimation)
+      const action = isKolPhase
+        ? "ESTIMATE_SOL_FROM_TOKENS"
+        : "ESTIMATE_TOKENS";
+
+      // Build payload with correct field names based on phase
+      const payload = {
+        tokenAddress: tokenData.tokenAddress,
+        saleAuthority: tokenData.saleAuthority || "",
+        idl,
+        programId: PROGRAM_ID,
+      };
+
+      // ✅ Add correct field name based on phase
+      if (isKolPhase) {
+        payload.amount = inputAmount; // KOL: token amount
+      } else {
+        payload.solAmount = inputAmount; // PUBLIC: SOL amount
+      }
+
       chrome.tabs.sendMessage(
         tab.id,
         {
-          action: "ESTIMATE_TOKENS",
-          payload: {
-            solAmount: solAmount,
-            idl,
-            programId: PROGRAM_ID,
-          },
+          action: action,
+          payload: payload,
         },
         (response) => {
           if (chrome.runtime.lastError) {
@@ -274,13 +300,12 @@ export default function BuySell({
             return;
           }
 
-          if (
-            response &&
-            response.success &&
-            response.data &&
-            response.data.estimatedTokens !== undefined
-          ) {
-            setEstimatedAmount(response.data.estimatedTokens);
+          if (response && response.success && response.data) {
+            // For KOL: estimatedSol, For PUBLIC: estimatedTokens
+            const estimated = isKolPhase
+              ? response.data.estimatedSol || 0
+              : response.data.estimatedTokens || 0;
+            setEstimatedAmount(estimated);
           } else {
             setEstimatedAmount(0);
           }
@@ -298,6 +323,12 @@ export default function BuySell({
     if (!amount || parseFloat(amount) <= 0) {
       return;
     }
+
+    // ✅ For BUY mode in KOL phase, use estimatedAmount (SOL)
+    // For BUY mode in PUBLIC phase, use amount (SOL)
+    // For SELL mode, use amount (tokens)
+    const transactionAmount =
+      mode === "buy" && isKolPhase ? estimatedAmount : amount;
 
     setIsProcessing(true);
 
@@ -329,7 +360,7 @@ export default function BuySell({
           action: "BUY_SELL_TOKEN",
           payload: {
             mode: mode, // "buy" or "sell"
-            amount: amount,
+            amount: transactionAmount, // ✅ Use calculated transaction amount
             tokenAddress: tokenData.tokenAddress,
             saleAuthority: tokenData.saleAuthority || "", // Add sale_authority from API
             idl,
@@ -658,7 +689,11 @@ export default function BuySell({
               color: "#888",
             }}
           >
-            {mode === "buy" ? "SOL Amount" : "Token Amount"}
+            {mode === "buy"
+              ? isKolPhase
+                ? "Token Allocated"
+                : "SOL Amount"
+              : "Token Amount"}
           </label>
 
           {/* ✅ Show allocation in BUY mode - KOL tokens or PUBLIC SOL */}
@@ -669,9 +704,7 @@ export default function BuySell({
               ) : (
                 <>
                   Remaining: {userAllocation.toLocaleString()}{" "}
-                  {tokenData?.phase === "kol"
-                    ? tokenData?.symbol || "tokens"
-                    : "SOL"}
+                  {isKolPhase ? tokenData?.symbol || "tokens" : "SOL"}
                 </>
               )}
             </div>
@@ -817,14 +850,15 @@ export default function BuySell({
           }}
         >
           <div style={{ color: "#888", marginBottom: "4px" }}>
-            You will receive
+            {isKolPhase ? "Estimated SOL" : "You will receive"}
           </div>
           <div style={{ color: "#fff", fontSize: "14px" }}>
             {isEstimating ? (
               <span style={{ color: "#888" }}>Calculating...</span>
             ) : estimatedAmount > 0 ? (
               <>
-                ~{estimatedAmount.toLocaleString()} {tokenData?.symbol}
+                ~{estimatedAmount.toLocaleString()}{" "}
+                {isKolPhase ? "SOL" : tokenData?.symbol}
               </>
             ) : (
               <span style={{ color: "#888" }}>
@@ -838,13 +872,22 @@ export default function BuySell({
       {/* Buy/Sell Button */}
       <button
         onClick={handleBuySell}
-        disabled={!amount || isProcessing || parseFloat(amount) <= 0}
+        disabled={
+          !amount ||
+          isProcessing ||
+          parseFloat(amount) <= 0 ||
+          (mode === "buy" && (isEstimating || estimatedAmount <= 0)) // ✅ Disable if estimating or no estimation in BUY mode
+        }
         style={{
           width: "100%",
           padding: "12px",
           background:
             mode === "buy"
-              ? !amount || isProcessing || parseFloat(amount) <= 0
+              ? !amount ||
+                isProcessing ||
+                parseFloat(amount) <= 0 ||
+                isEstimating ||
+                estimatedAmount <= 0
                 ? "#0a4a7a"
                 : "#1d9bf0"
               : !amount || isProcessing || parseFloat(amount) <= 0
@@ -855,15 +898,26 @@ export default function BuySell({
           borderRadius: "8px",
           fontSize: "14px",
           cursor:
-            !amount || isProcessing || parseFloat(amount) <= 0
+            !amount ||
+            isProcessing ||
+            parseFloat(amount) <= 0 ||
+            (mode === "buy" && (isEstimating || estimatedAmount <= 0))
               ? "not-allowed"
               : "pointer",
-          opacity: !amount || isProcessing || parseFloat(amount) <= 0 ? 0.5 : 1,
+          opacity:
+            !amount ||
+            isProcessing ||
+            parseFloat(amount) <= 0 ||
+            (mode === "buy" && (isEstimating || estimatedAmount <= 0))
+              ? 0.5
+              : 1,
           marginBottom: "12px",
         }}
       >
         {isProcessing
           ? "Processing..."
+          : mode === "buy" && isEstimating
+          ? "Estimating..."
           : mode === "buy"
           ? "Buy Token"
           : "Sell Token"}

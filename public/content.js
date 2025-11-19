@@ -488,6 +488,18 @@ window.addEventListener("message", (event) => {
     }
   }
   
+  // ✅ Handle SOL estimation response from inpage (for KOL phase)
+  if (event.data.source === "TTC_INPAGE" && event.data.type === "SOL_ESTIMATION_RESPONSE") {
+    console.log("[TTC Content] 📊 SOL estimation response received:", event.data);
+    if (window.__estimateSolCallback) {
+      window.__estimateSolCallback({
+        success: true,
+        data: event.data
+      });
+      delete window.__estimateSolCallback;
+    }
+  }
+  
   // Handle buy/sell token response from inpage
   if (event.data.source === "TTC_INPAGE" && event.data.type === "BUY_SELL_TOKEN_RESPONSE") {
     console.log("[TTC Content] 💰 Buy/Sell token response received:", event.data);
@@ -664,6 +676,29 @@ safeChrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       window.postMessage({
         source: "TTC_CONTENT",
         type: "ESTIMATE_TOKENS",
+        payload: request.payload
+      }, "*");
+    }, 500);
+    
+    // Return true to indicate async response
+    return true;
+  }
+  
+  // ✅ Handle ESTIMATE_SOL_FROM_TOKENS request (for KOL phase)
+  if (request.action === "ESTIMATE_SOL_FROM_TOKENS") {
+    console.log("[TTC Content] 📊 Estimate SOL from tokens request");
+    
+    // Inject inpage if not already done
+    injectInpage();
+    
+    // Store callback for async response
+    window.__estimateSolCallback = sendResponse;
+    
+    // Wait for inpage to load then send message
+    setTimeout(() => {
+      window.postMessage({
+        source: "TTC_CONTENT",
+        type: "ESTIMATE_SOL_FROM_TOKENS",
         payload: request.payload
       }, "*");
     }, 500);

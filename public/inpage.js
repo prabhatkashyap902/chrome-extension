@@ -96,6 +96,11 @@
       await estimateTokensForSol(event.data.payload);
     }
     
+    // ✅ Handle ESTIMATE_SOL_FROM_TOKENS request (for KOL phase)
+    if (event.data.source === "TTC_CONTENT" && event.data.type === "ESTIMATE_SOL_FROM_TOKENS") {
+      await estimateSolFromTokens(event.data.payload);
+    }
+    
     // Handle BUY_SELL_TOKEN request
     if (event.data.source === "TTC_CONTENT" && event.data.type === "BUY_SELL_TOKEN") {
       await buySellToken(event.data.payload);
@@ -858,6 +863,226 @@
     }
   }
   
+  // ✅ Function to estimate SOL from tokens (for KOL phase)
+  async function estimateSolFromTokens(payload) {
+    try {
+      console.log("[TTC Inpage] 📊 Estimating SOL from tokens...");
+      console.log("[TTC Inpage] Token Amount:", payload.amount);
+      
+      // Wait for web3 to be available
+      if (!window.solanaWeb3) {
+        console.log("[TTC Inpage] Waiting for Solana libraries to load...");
+        await new Promise((resolve) => {
+          const checkInterval = setInterval(() => {
+            if (window.solanaWeb3) {
+              clearInterval(checkInterval);
+              resolve();
+            }
+          }, 100);
+          setTimeout(() => {
+            clearInterval(checkInterval);
+            if (!window.solanaWeb3) {
+              throw new Error("Solana libraries failed to load");
+            }
+          }, 5000);
+        });
+      }
+      
+      console.log("[TTC Inpage] ✅ Solana libraries are available");
+      
+      // Get web3.js from global window object
+      const { PublicKey, Transaction, LAMPORTS_PER_SOL } = window.solanaWeb3;
+      
+      // Check for wallet
+      let provider = null;
+      
+      if (window.phantom?.solana?.isConnected) {
+        provider = window.phantom.solana;
+      } else if (window.solana?.isPhantom && window.solana?.isConnected) {
+        provider = window.solana;
+      } else if (window.backpack?.isConnected) {
+        provider = window.backpack;
+      } else if (window.solflare?.isConnected) {
+        provider = window.solflare;
+      }
+      
+      if (!provider || !provider.isConnected) {
+        throw new Error("Wallet not connected");
+      }
+      
+      const publicKey = provider.publicKey;
+      console.log("[TTC Inpage] ✅ Wallet connected:", publicKey.toString());
+      
+      // Validate program ID
+      if (!payload.programId || payload.programId === "YOUR_PROGRAM_ID_HERE") {
+        throw new Error("⚠️ Program ID not configured!");
+      }
+      
+      const PROGRAM_ID = new PublicKey(payload.programId);
+      const tokenMint = new PublicKey(payload.tokenAddress);
+      const saleConfigAuthority = new PublicKey(payload.saleAuthority);
+      
+      // Derive PDAs
+      const textEncoder = new TextEncoder();
+      
+      const [factoryConfigPda] = PublicKey.findProgramAddressSync(
+        [textEncoder.encode("factory_config_v2")],
+        PROGRAM_ID
+      );
+      
+      const [saleConfigPda] = PublicKey.findProgramAddressSync(
+        [
+          textEncoder.encode("sale_config"),
+          saleConfigAuthority.toBuffer(),
+          tokenMint.toBuffer()
+        ],
+        PROGRAM_ID
+      );
+      
+      const [priceCachePda] = PublicKey.findProgramAddressSync(
+        [textEncoder.encode("price_cache"), factoryConfigPda.toBuffer()],
+        PROGRAM_ID
+      );
+      
+      // Derive public_user_data PDA (optional account)
+      const [publicUserDataPda] = PublicKey.findProgramAddressSync(
+        [
+          textEncoder.encode("public_user_data"),
+          publicKey.toBuffer(),
+          tokenMint.toBuffer()
+        ],
+        PROGRAM_ID
+      );
+      
+      console.log("[TTC Inpage] 📍 Checking if public_user_data account exists...");
+      
+      // Check if public_user_data account exists on-chain
+      let publicUserDataAccount = publicUserDataPda;
+      try {
+        const accountInfo = await solanaRpc("getAccountInfo", [
+          publicUserDataPda.toString(),
+          { encoding: "base64" }
+        ]);
+        
+        if (!accountInfo.result || !accountInfo.result.value) {
+          console.log("[TTC Inpage] ⚠️ public_user_data doesn't exist yet, using PROGRAM_ID");
+          publicUserDataAccount = PROGRAM_ID; // Use PROGRAM_ID for optional non-existent accounts
+        } else {
+          console.log("[TTC Inpage] ✅ public_user_data exists");
+        }
+      } catch (err) {
+        console.log("[TTC Inpage] ⚠️ Error checking public_user_data, using PROGRAM_ID:", err.message);
+        publicUserDataAccount = PROGRAM_ID;
+      }
+      
+      console.log("[TTC Inpage] 📍 Building estimation instruction...");
+      
+      // Get token amount as BN (integer tokens, not lamports)
+      const tokenAmount = BigInt(Math.floor(parseFloat(payload.amount)));
+      
+      // Find the instruction discriminator for calculateSolForTokens from IDL
+      const estimateInstruction = payload.idl.instructions.find(
+        ix => ix.name === "calculateSolForTokens" || ix.name === "calculate_sol_for_tokens"
+      );
+      
+      if (!estimateInstruction || !estimateInstruction.discriminator) {
+        throw new Error("Could not find calculateSolForTokens in IDL");
+      }
+      
+      const discriminator = new Uint8Array(estimateInstruction.discriminator);
+      console.log("[TTC Inpage] 🔍 Method discriminator:", Array.from(discriminator));
+      
+      // Build instruction data: [8-byte discriminator][8-byte u64 token_amount]
+      const instructionData = new Uint8Array(16);
+      instructionData.set(discriminator, 0);
+      
+      // Set token amount as little-endian u64
+      const dataView = new DataView(instructionData.buffer);
+      dataView.setBigUint64(8, tokenAmount, true);
+      
+      console.log("[TTC Inpage] 📦 Instruction data:", Array.from(instructionData));
+      
+      // Create the instruction (matching Anchor's account order)
+      const instruction = {
+        programId: PROGRAM_ID,
+        keys: [
+          { pubkey: tokenMint, isSigner: false, isWritable: false }, // token_mint
+          { pubkey: saleConfigPda, isSigner: false, isWritable: false }, // sale_config
+          { pubkey: factoryConfigPda, isSigner: false, isWritable: false }, // factory_config
+          { pubkey: publicUserDataAccount, isSigner: false, isWritable: false }, // public_user_data (optional - use PROGRAM_ID if doesn't exist)
+          { pubkey: publicKey, isSigner: false, isWritable: false }, // user
+          { pubkey: priceCachePda, isSigner: false, isWritable: false }, // price_cache
+        ],
+        data: instructionData
+      };
+      
+      // Get latest blockhash
+      console.log("[TTC Inpage] Getting latest blockhash for simulation...");
+      const blockhashData = await solanaRpc("getLatestBlockhash", [{ commitment: "finalized" }]);
+      const recentBlockhash = blockhashData.result.value.blockhash;
+      
+      // Create a transaction
+      const transaction = new Transaction();
+      transaction.recentBlockhash = recentBlockhash;
+      transaction.feePayer = publicKey;
+      transaction.add(instruction);
+      
+      // Serialize the transaction
+      const serialized = transaction.serialize({ requireAllSignatures: false, verifySignatures: false });
+      const base64Tx = btoa(String.fromCharCode.apply(null, serialized));
+      
+      // Simulate the transaction
+      console.log("[TTC Inpage] 🎬 Simulating transaction...");
+      const simulation = await solanaRpc("simulateTransaction", [
+        base64Tx,
+        {
+          encoding: "base64",
+          commitment: "processed"
+        }
+      ]);
+      
+      console.log("[TTC Inpage] 📊 Simulation result:", simulation);
+      
+      if (simulation.result.value.err) {
+        throw new Error(`Simulation failed: ${JSON.stringify(simulation.result.value.err)}`);
+      }
+      
+      // Parse the return data from simulation
+      if (!simulation.result.value.returnData) {
+        throw new Error("No return data from simulation");
+      }
+      
+      const returnDataBase64 = simulation.result.value.returnData.data[0];
+      const returnDataBytes = Uint8Array.from(atob(returnDataBase64), c => c.charCodeAt(0));
+      
+      console.log("[TTC Inpage] 📥 Return data bytes:", Array.from(returnDataBytes));
+      
+      // Parse as u64 little-endian (SOL in lamports)
+      const returnView = new DataView(returnDataBytes.buffer);
+      const estimatedLamports = returnView.getBigUint64(0, true);
+      const estimatedSol = Number(estimatedLamports) / LAMPORTS_PER_SOL;
+      console.log("[TTC Inpage] ✅ Estimated SOL:", estimatedSol);
+      
+      // Send success response
+      window.postMessage({
+        source: "TTC_INPAGE",
+        type: "SOL_ESTIMATION_RESPONSE",
+        success: true,
+        estimatedSol: estimatedSol
+      }, "*");
+      
+    } catch (error) {
+      console.error("[TTC Inpage] ❌ Estimation error:", error);
+      window.postMessage({
+        source: "TTC_INPAGE",
+        type: "SOL_ESTIMATION_RESPONSE",
+        success: false,
+        error: error.message || "Unknown error",
+        estimatedSol: 0
+      }, "*");
+    }
+  }
+  
   // Function to buy or sell token
   async function buySellToken(payload) {
     try {
@@ -1176,9 +1401,16 @@
         // Parse Anchor error codes
         const errorMsg = txResult.error.message || JSON.stringify(txResult.error);
         
+        console.error("[TTC Inpage] ❌ Transaction Error:", txResult.error);
+        console.error("[TTC Inpage] 📋 Error Logs:", txResult.error.data?.logs || "No logs");
+        
         // Check for specific error codes
         if (errorMsg.includes("0x2971") || errorMsg.includes("10609")) {
           throw new Error("⚠️ Transaction Limit Exceeded! You're trying to buy/sell more than the per-transaction limit. Please reduce your amount and try again.");
+        }
+        
+        if (errorMsg.includes("0x2870") || errorMsg.includes("10352")) {
+          throw new Error("⚠️ Insufficient token allocation! The token sale has insufficient tokens available for this purchase. Try a smaller amount.");
         }
         
         throw new Error(errorMsg);
@@ -1552,9 +1784,9 @@
           { pubkey: tokenMint, isSigner: false, isWritable: false }, // token_mint
           { pubkey: saleConfigPda, isSigner: false, isWritable: false }, // sale_config
           { pubkey: walletPublicKey, isSigner: false, isWritable: false }, // user
-          { pubkey: isKolPhase ? kolDataPda : PROGRAM_ID, isSigner: false, isWritable: false }, // kol_data (optional)
-          { pubkey: isKolPhase ? kolMasterPda : PROGRAM_ID, isSigner: false, isWritable: false }, // kol_master (optional)
-          { pubkey: !isKolPhase ? publicUserDataPda : PROGRAM_ID, isSigner: false, isWritable: false } // public_user_data (optional)
+          { pubkey: kolDataPda, isSigner: false, isWritable: false }, // kol_data (optional)
+          { pubkey: kolMasterPda, isSigner: false, isWritable: false }, // kol_master (optional)
+          { pubkey: publicUserDataPda, isSigner: false, isWritable: false } // public_user_data (optional)
         ],
         data: instructionData
       };
